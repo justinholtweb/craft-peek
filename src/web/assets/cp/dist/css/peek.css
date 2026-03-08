@@ -1,0 +1,93 @@
+/* Peek — CP Styles */
+
+/* Dashboard */
+.peek-dashboard {
+    max-width: 1200px;
+}
+
+.peek-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.peek-card {
+    background: var(--ui-control-bg-color, #fff);
+    border: 1px solid var(--hairline-color, #e3e5e8);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.peek-card h2 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--medium-text-color, #8f98a3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 8px;
+}
+
+.peek-stat-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--text-color, #3f4d5a);
+    line-height: 1.1;
+}
+
+.peek-stat--warning {
+    color: var(--warning-color, #e5a000);
+}
+
+.peek-stat-label {
+    font-size: 12px;
+    color: var(--light-text-color, #8f98a3);
+    margin-top: 4px;
+}
+
+/* Releases */
+.peek-releases .peek-toolbar {
+    margin-bottom: 16px;
+}
+
+.peek-release-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.peek-release-actions .inline {
+    display: inline;
+}
+
+.peek-published-info {
+    margin-top: 8px;
+}
+
+/* Release entries table */
+.peek-releases table .flex {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+/* Empty states */
+.peek-empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--light-text-color, #8f98a3);
+}
+
+.peek-empty .btn {
+    margin-top: 12px;
+}
+
+/* Section counts */
+.peek-section-counts {
+    margin-bottom: 32px;
+}
+
+.peek-section-counts h2,
+.peek-drafts-table h2 {
+    margin-bottom: 12px;
+}

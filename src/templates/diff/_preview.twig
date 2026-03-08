@@ -1,0 +1,29 @@
+{% extends 'peek/_layouts/plugin' %}
+
+{% set title = 'Visual Preview: ' ~ draft.title %}
+{% set selectedSubnavItem = 'dashboard' %}
+
+{% do view.registerAssetBundle('justinholtweb\\peek\\web\\assets\\diff\\DiffAsset') %}
+
+{% block pluginContent %}
+    <div class="peek-preview-fullscreen">
+        <div class="peek-preview-container">
+            <div class="peek-preview-pane">
+                <h3>{{ 'Live'|t('peek') }}</h3>
+                {% if previewUrls.canonical %}
+                    <iframe src="{{ previewUrls.canonical }}" class="peek-preview-iframe" id="peek-iframe-canonical"></iframe>
+                {% else %}
+                    <p class="light">{{ 'No live URL available.'|t('peek') }}</p>
+                {% endif %}
+            </div>
+            <div class="peek-preview-pane">
+                <h3>{{ 'Draft'|t('peek') }}</h3>
+                {% if previewUrls.draft %}
+                    <iframe src="{{ previewUrls.draft }}" class="peek-preview-iframe" id="peek-iframe-draft"></iframe>
+                {% else %}
+                    <p class="light">{{ 'No draft preview URL available.'|t('peek') }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

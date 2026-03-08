@@ -1,0 +1,110 @@
+<?php
+
+return [
+    // Plugin
+    'Peek' => 'Peek',
+    'Dashboard' => 'Dashboard',
+    'Releases' => 'Releases',
+    'Settings' => 'Settings',
+
+    // Permissions
+    'Access Peek' => 'Access Peek',
+    'View diffs' => 'View diffs',
+    'Manage releases' => 'Manage releases',
+    'Publish releases' => 'Publish releases',
+    'Schedule releases' => 'Schedule releases',
+    'Delete releases' => 'Delete releases',
+    'Manage Peek settings' => 'Manage Peek settings',
+
+    // Dashboard
+    'Peek Dashboard' => 'Peek Dashboard',
+    'Pending Drafts' => 'Pending Drafts',
+    'Stale Drafts' => 'Stale Drafts',
+    'Active Releases' => 'Active Releases',
+    'Older than {days} days' => 'Older than {days} days',
+    'Drafts by Section' => 'Drafts by Section',
+    'Section' => 'Section',
+    'Drafts' => 'Drafts',
+    'Title' => 'Title',
+    'Author' => 'Author',
+    'Last Updated' => 'Last Updated',
+    'View Diff' => 'View Diff',
+    'Diff' => 'Diff',
+    'No pending drafts found.' => 'No pending drafts found.',
+
+    // Releases
+    'New Release' => 'New Release',
+    'Release Name' => 'Release Name',
+    'A descriptive name for this release.' => 'A descriptive name for this release.',
+    'Description' => 'Description',
+    'Optional release notes or description.' => 'Optional release notes or description.',
+    'Status' => 'Status',
+    'Entry' => 'Entry',
+    'Entries' => 'Entries',
+    'Scheduled' => 'Scheduled',
+    'Created' => 'Created',
+    'Name' => 'Name',
+    'Draft' => 'Draft',
+    'Ready' => 'Ready',
+    'Published' => 'Published',
+    'Failed' => 'Failed',
+    'Pending' => 'Pending',
+    'Applied' => 'Applied',
+    'Scheduled Date' => 'Scheduled Date',
+    'When to automatically publish this release.' => 'When to automatically publish this release.',
+    'Entries in Release' => 'Entries in Release',
+    'No entries added to this release yet.' => 'No entries added to this release yet.',
+    'No releases yet.' => 'No releases yet.',
+    'Create Your First Release' => 'Create Your First Release',
+    'Publish Now' => 'Publish Now',
+    'Delete' => 'Delete',
+    'Remove' => 'Remove',
+    'Are you sure you want to delete this release?' => 'Are you sure you want to delete this release?',
+    'Release saved.' => 'Release saved.',
+    'Could not save release.' => 'Could not save release.',
+    'Release published successfully.' => 'Release published successfully.',
+    'Failed to publish release.' => 'Failed to publish release.',
+    'Release deleted.' => 'Release deleted.',
+    'Could not delete release.' => 'Could not delete release.',
+    'Entry added to release.' => 'Entry added to release.',
+    'Could not add entry to release.' => 'Could not add entry to release.',
+    'Entry removed from release.' => 'Entry removed from release.',
+    'Could not remove entry from release.' => 'Could not remove entry from release.',
+    'Published on {date}' => 'Published on {date}',
+
+    // Diff
+    'field(s) changed' => 'field(s) changed',
+    'Edit Draft' => 'Edit Draft',
+    'Field Diff' => 'Field Diff',
+    'Visual Preview' => 'Visual Preview',
+    'Live' => 'Live',
+    'No differences found.' => 'No differences found.',
+    'No live URL available.' => 'No live URL available.',
+    'No draft preview URL available.' => 'No draft preview URL available.',
+    'Changed' => 'Changed',
+    'Unchanged' => 'Unchanged',
+
+    // Sidebar
+    'Fields Changed' => 'Fields Changed',
+    'Not in any release' => 'Not in any release',
+
+    // Settings
+    'Peek Settings' => 'Peek Settings',
+    'General' => 'General',
+    'Stale Draft Days' => 'Stale Draft Days',
+    'Number of days before a draft is considered stale.' => 'Number of days before a draft is considered stale.',
+    'Enable Visual Preview' => 'Enable Visual Preview',
+    'Show side-by-side iframe preview in the diff view.' => 'Show side-by-side iframe preview in the diff view.',
+    'Max Entries Per Release' => 'Max Entries Per Release',
+    'Maximum number of entries that can be added to a single release.' => 'Maximum number of entries that can be added to a single release.',
+    'Settings saved.' => 'Settings saved.',
+    'Could not save settings.' => 'Could not save settings.',
+
+    // Validation
+    'Release has no entries.' => 'Release has no entries.',
+    'Draft #{id} no longer exists.' => 'Draft #{id} no longer exists.',
+    'Canonical entry #{id} no longer exists.' => 'Canonical entry #{id} no longer exists.',
+
+    // Queue
+    'Publishing release #{id}' => 'Publishing release #{id}',
+];

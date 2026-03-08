@@ -1,0 +1,48 @@
+{% extends 'peek/_layouts/plugin' %}
+{% import '_includes/forms.twig' as forms %}
+
+{% set title = 'Peek Settings'|t('peek') %}
+{% set selectedSubnavItem = 'settings' %}
+{% set fullPageForm = true %}
+
+{% block pluginContent %}
+    <input type="hidden" name="action" value="peek/settings/save">
+    {{ redirectInput('peek/settings') }}
+
+    <div id="fields">
+        <h2>{{ 'General'|t('peek') }}</h2>
+
+        {{ forms.textField({
+            label: 'Stale Draft Days'|t('peek'),
+            instructions: 'Number of days before a draft is considered stale.'|t('peek'),
+            id: 'staleDraftDays',
+            name: 'staleDraftDays',
+            value: settings.staleDraftDays,
+            type: 'number',
+            min: 1,
+        }) }}
+
+        {{ forms.lightswitchField({
+            label: 'Enable Visual Preview'|t('peek'),
+            instructions: 'Show side-by-side iframe preview in the diff view.'|t('peek'),
+            id: 'enableVisualPreview',
+            name: 'enableVisualPreview',
+            on: settings.enableVisualPreview,
+        }) }}
+
+        <hr>
+
+        <h2>{{ 'Releases'|t('peek') }}</h2>
+
+        {{ forms.textField({
+            label: 'Max Entries Per Release'|t('peek'),
+            instructions: 'Maximum number of entries that can be added to a single release.'|t('peek'),
+            id: 'maxEntriesPerRelease',
+            name: 'maxEntriesPerRelease',
+            value: settings.maxEntriesPerRelease,
+            type: 'number',
+            min: 1,
+            max: 500,
+        }) }}
+    </div>
+{% endblock %}

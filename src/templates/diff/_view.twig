@@ -1,0 +1,58 @@
+{% extends 'peek/_layouts/plugin' %}
+
+{% set title = 'Diff: ' ~ draft.title %}
+{% set selectedSubnavItem = 'dashboard' %}
+
+{% do view.registerAssetBundle('justinholtweb\\peek\\web\\assets\\diff\\DiffAsset') %}
+
+{% block pluginContent %}
+    <div class="peek-diff">
+        <div class="peek-diff-header">
+            <h2>{{ draft.title }}</h2>
+            <div class="peek-diff-meta">
+                <span>{{ 'Draft'|t('peek') }} #{{ draft.draftId ?? draft.id }}</span>
+                &middot;
+                <span>{{ changedCount }} {{ 'field(s) changed'|t('peek') }}</span>
+                &middot;
+                <a href="{{ draft.cpEditUrl }}">{{ 'Edit Draft'|t('peek') }}</a>
+            </div>
+        </div>
+
+        {# Tab navigation #}
+        <div class="peek-diff-tabs">
+            <button class="btn peek-tab active" data-tab="field-diff">{{ 'Field Diff'|t('peek') }}</button>
+            {% if previewUrls.canonical and previewUrls.draft %}
+                <button class="btn peek-tab" data-tab="visual-preview">{{ 'Visual Preview'|t('peek') }}</button>
+            {% endif %}
+        </div>
+
+        {# Field Diff Tab #}
+        <div class="peek-tab-content" id="tab-field-diff">
+            {% if diffs|length %}
+                {% for diff in diffs %}
+                    {% include 'peek/diff/_field-diff' with { diff: diff } %}
+                {% endfor %}
+            {% else %}
+                <div class="peek-empty">
+                    <p>{{ 'No differences found.'|t('peek') }}</p>
+                </div>
+            {% endif %}
+        </div>
+
+        {# Visual Preview Tab #}
+        {% if previewUrls.canonical and previewUrls.draft %}
+            <div class="peek-tab-content" id="tab-visual-preview" style="display: none;">
+                <div class="peek-preview-container">
+                    <div class="peek-preview-pane">
+                        <h3>{{ 'Live'|t('peek') }}</h3>
+                        <iframe src="{{ previewUrls.canonical }}" class="peek-preview-iframe" id="peek-iframe-canonical"></iframe>
+                    </div>
+                    <div class="peek-preview-pane">
+                        <h3>{{ 'Draft'|t('peek') }}</h3>
+                        <iframe src="{{ previewUrls.draft }}" class="peek-preview-iframe" id="peek-iframe-draft"></iframe>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

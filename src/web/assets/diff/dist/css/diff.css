@@ -1,0 +1,196 @@
+/* Peek — Diff Styles */
+
+/* Diff header */
+.peek-diff-header {
+    margin-bottom: 24px;
+}
+
+.peek-diff-header h2 {
+    margin: 0 0 4px;
+}
+
+.peek-diff-meta {
+    font-size: 13px;
+    color: var(--light-text-color, #8f98a3);
+}
+
+.peek-diff-meta a {
+    color: var(--link-color, #0d6efd);
+}
+
+/* Tabs */
+.peek-diff-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--hairline-color, #e3e5e8);
+    padding-bottom: 12px;
+}
+
+.peek-tab.active {
+    background: var(--ui-control-active-bg-color, #0d6efd);
+    color: #fff;
+}
+
+/* Field diff blocks */
+.peek-field-diff {
+    border: 1px solid var(--hairline-color, #e3e5e8);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.peek-field-diff.no-changes {
+    opacity: 0.5;
+}
+
+.peek-field-diff.no-changes .peek-field-diff-body {
+    display: none;
+}
+
+.peek-field-diff-header {
+    background: var(--gray-050, #f8f9fa);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.peek-field-diff.no-changes .peek-field-diff-header {
+    cursor: default;
+}
+
+.peek-field-handle {
+    color: var(--light-text-color, #8f98a3);
+    font-size: 12px;
+}
+
+.peek-field-diff-body {
+    padding: 14px;
+    overflow-x: auto;
+}
+
+/* jfcherng/php-diff SideBySide table styling */
+.peek-field-diff-body table.diff {
+    width: 100%;
+    font-size: 12px;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+    border-collapse: collapse;
+}
+
+.peek-field-diff-body table.diff td {
+    padding: 2px 8px;
+    vertical-align: top;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.peek-field-diff-body table.diff .old {
+    background: #ffeef0;
+}
+
+.peek-field-diff-body table.diff .new {
+    background: #e6ffec;
+}
+
+.peek-field-diff-body table.diff del {
+    background: #fdb8c0;
+    text-decoration: none;
+}
+
+.peek-field-diff-body table.diff ins {
+    background: #acf2bd;
+    text-decoration: none;
+}
+
+.peek-field-diff-body table.diff .line-number {
+    color: var(--light-text-color, #8f98a3);
+    width: 1%;
+    min-width: 40px;
+    text-align: right;
+    padding-right: 12px;
+    user-select: none;
+    border-right: 1px solid var(--hairline-color, #e3e5e8);
+}
+
+/* Simple diff (fallback for non-text fields) */
+.peek-simple-diff {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.peek-diff-removed {
+    background: #ffeef0;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    border-left: 3px solid #f97583;
+}
+
+.peek-diff-added {
+    background: #e6ffec;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    border-left: 3px solid #85e89d;
+}
+
+/* Boolean diff */
+.peek-boolean-diff {
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.peek-boolean-diff .peek-diff-removed {
+    display: inline;
+    padding: 2px 8px;
+    border-left: none;
+}
+
+.peek-boolean-diff .peek-diff-added {
+    display: inline;
+    padding: 2px 8px;
+    border-left: none;
+}
+
+/* Visual Preview */
+.peek-preview-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    height: calc(100vh - 250px);
+    min-height: 400px;
+}
+
+.peek-preview-pane {
+    display: flex;
+    flex-direction: column;
+}
+
+.peek-preview-pane h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: var(--medium-text-color, #8f98a3);
+}
+
+.peek-preview-iframe {
+    flex: 1;
+    width: 100%;
+    border: 1px solid var(--hairline-color, #e3e5e8);
+    border-radius: 4px;
+    background: #fff;
+}
+
+.peek-preview-fullscreen .peek-preview-container {
+    height: calc(100vh - 180px);
+}

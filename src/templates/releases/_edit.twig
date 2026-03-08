@@ -1,0 +1,157 @@
+{% extends 'peek/_layouts/plugin' %}
+{% import '_includes/forms.twig' as forms %}
+
+{% set title = title ?? 'New Release'|t('peek') %}
+{% set selectedSubnavItem = 'releases' %}
+{% set fullPageForm = true %}
+
+{% do view.registerAssetBundle('justinholtweb\\peek\\web\\assets\\cp\\CpAsset') %}
+
+{% block pluginContent %}
+    <input type="hidden" name="action" value="peek/releases/save">
+    {{ redirectInput('peek/releases/{id}') }}
+
+    {% if release.id %}
+        <input type="hidden" name="releaseId" value="{{ release.id }}">
+    {% endif %}
+
+    <input type="hidden" name="siteId" value="{{ release.siteId ?? currentSite.id }}">
+
+    <div id="fields">
+        {{ forms.textField({
+            label: 'Release Name'|t('peek'),
+            instructions: 'A descriptive name for this release.'|t('peek'),
+            id: 'name',
+            name: 'name',
+            value: release.name,
+            required: true,
+            first: true,
+            errors: release.getErrors('name'),
+        }) }}
+
+        {{ forms.textareaField({
+            label: 'Description'|t('peek'),
+            instructions: 'Optional release notes or description.'|t('peek'),
+            id: 'description',
+            name: 'description',
+            value: release.description,
+            rows: 3,
+        }) }}
+
+        {{ forms.selectField({
+            label: 'Status'|t('peek'),
+            id: 'status',
+            name: 'status',
+            value: release.status.value,
+            options: [
+                { label: 'Draft'|t('peek'), value: 'draft' },
+                { label: 'Ready'|t('peek'), value: 'ready' },
+                { label: 'Scheduled'|t('peek'), value: 'scheduled' },
+            ],
+        }) }}
+
+        {{ forms.dateTimeField({
+            label: 'Scheduled Date'|t('peek'),
+            instructions: 'When to automatically publish this release.'|t('peek'),
+            id: 'scheduledDate',
+            name: 'scheduledDate',
+            value: release.scheduledDate,
+        }) }}
+    </div>
+
+    {# Entries in this release #}
+    {% if release.id %}
+        <hr>
+        <h2>{{ 'Entries in Release'|t('peek') }} ({{ resolvedEntries|length }})</h2>
+
+        {% if resolvedEntries|length %}
+            <table class="data fullwidth">
+                <thead>
+                    <tr>
+                        <th>{{ 'Entry'|t('peek') }}</th>
+                        <th>{{ 'Section'|t('peek') }}</th>
+                        <th>{{ 'Status'|t('peek') }}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in resolvedEntries %}
+                        <tr>
+                            <td>
+                                {% if item.draft %}
+                                    <a href="{{ item.draft.cpEditUrl }}">{{ item.title }}</a>
+                                    <span class="light"> — {{ 'Draft'|t('peek') }}</span>
+                                {% elseif item.canonical %}
+                                    <a href="{{ item.canonical.cpEditUrl }}">{{ item.title }}</a>
+                                    {% if item.releaseEntry.status == 'published' %}
+                                        <span class="light"> — {{ 'Applied'|t('peek') }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="light">{{ item.title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.section }}</td>
+                            <td>
+                                {% if item.releaseEntry.status == 'published' %}
+                                    <span class="status green"></span> {{ 'Published'|t('peek') }}
+                                {% elseif item.releaseEntry.status == 'failed' %}
+                                    <span class="status red"></span> {{ 'Failed'|t('peek') }}
+                                {% else %}
+                                    <span class="status"></span> {{ 'Pending'|t('peek') }}
+                                {% endif %}
+                            </td>
+                            <td class="thin">
+                                {% if item.releaseEntry.draftId and item.releaseEntry.status == 'pending' %}
+                                    <div class="flex">
+                                        {% if item.draft %}
+                                            <a href="{{ url('peek/diff/' ~ item.releaseEntry.draftId) }}" class="btn small">{{ 'Diff'|t('peek') }}</a>
+                                        {% endif %}
+                                        <form method="post" style="display:inline">
+                                            {{ csrfInput() }}
+                                            <input type="hidden" name="action" value="peek/releases/remove-entry">
+                                            <input type="hidden" name="releaseId" value="{{ release.id }}">
+                                            <input type="hidden" name="draftId" value="{{ item.releaseEntry.draftId }}">
+                                            <button type="submit" class="btn small">{{ 'Remove'|t('peek') }}</button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="light">{{ 'No entries added to this release yet.'|t('peek') }}</p>
+        {% endif %}
+
+        {# Publish / Delete actions #}
+        {% if release.status.value not in ['published', 'publishing'] %}
+            <hr>
+            <div class="peek-release-actions">
+                <form method="post" class="inline">
+                    {{ csrfInput() }}
+                    <input type="hidden" name="action" value="peek/releases/publish">
+                    <input type="hidden" name="releaseId" value="{{ release.id }}">
+                    <button type="submit" class="btn submit">{{ 'Publish Now'|t('peek') }}</button>
+                </form>
+
+                <form method="post" class="inline">
+                    {{ csrfInput() }}
+                    <input type="hidden" name="action" value="peek/releases/delete">
+                    <input type="hidden" name="releaseId" value="{{ release.id }}">
+                    <button type="submit" class="btn" data-confirm="{{ 'Are you sure you want to delete this release?'|t('peek') }}">{{ 'Delete'|t('peek') }}</button>
+                </form>
+            </div>
+        {% endif %}
+
+        {# Published release info #}
+        {% if release.status.value == 'published' %}
+            <hr>
+            <div class="peek-published-info">
+                <p class="light">
+                    {{ 'Published on {date}'|t('peek', { date: release.publishedDate|date('M j, Y g:i A') }) }}
+                </p>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

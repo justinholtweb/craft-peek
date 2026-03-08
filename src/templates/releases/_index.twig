@@ -1,0 +1,49 @@
+{% extends 'peek/_layouts/plugin' %}
+
+{% set title = 'Releases'|t('peek') %}
+{% set selectedSubnavItem = 'releases' %}
+
+{% do view.registerAssetBundle('justinholtweb\\peek\\web\\assets\\cp\\CpAsset') %}
+
+{% block pluginContent %}
+    <div class="peek-releases">
+        <div class="peek-toolbar">
+            <a href="{{ url('peek/releases/new') }}" class="btn submit">{{ 'New Release'|t('peek') }}</a>
+        </div>
+
+        {% if releases|length %}
+            <table class="data fullwidth">
+                <thead>
+                    <tr>
+                        <th>{{ 'Name'|t('peek') }}</th>
+                        <th>{{ 'Status'|t('peek') }}</th>
+                        <th>{{ 'Entries'|t('peek') }}</th>
+                        <th>{{ 'Scheduled'|t('peek') }}</th>
+                        <th>{{ 'Created'|t('peek') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for release in releases %}
+                        <tr>
+                            <td>
+                                <a href="{{ url('peek/releases/' ~ release.id) }}">{{ release.name }}</a>
+                            </td>
+                            <td>
+                                <span class="status {{ release.status.color() }}"></span>
+                                {{ release.status.label() }}
+                            </td>
+                            <td>{{ release.entryCount }}</td>
+                            <td>{{ release.scheduledDate ? release.scheduledDate|date('M j, Y g:i A') : '—' }}</td>
+                            <td>{{ release.dateCreated|date('M j, Y') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="peek-empty">
+                <p>{{ 'No releases yet.'|t('peek') }}</p>
+                <a href="{{ url('peek/releases/new') }}" class="btn submit">{{ 'Create Your First Release'|t('peek') }}</a>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
