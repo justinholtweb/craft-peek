@@ -1,7 +1,7 @@
 {
     "name": "justinholtweb/craft-peek",
     "description": "Content staging, visual diff, and coordinated releases for Craft CMS.",
-    "version": "1.0.0",
+    "version": "5.0.0",
     "type": "craft-plugin",
     "license": "proprietary",
     "minimum-stability": "dev",
@@ -12,12 +12,30 @@
         "jfcherng/php-diff": "^6.0"
     },
     "require-dev": {
+        "codeception/codeception": "^5.0",
         "craftcms/ecs": "dev-main",
         "craftcms/phpstan": "dev-main"
     },
     "autoload": {
         "psr-4": {
             "justinholtweb\\peek\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "justinholtweb\\peek\\tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "codecept run unit",
+        "ecs": "ecs check",
+        "ecs-fix": "ecs check --fix",
+        "phpstan": "phpstan analyse"
+    },
+    "config": {
+        "allow-plugins": {
+            "craftcms/plugin-installer": true,
+            "yiisoft/yii2-composer": true
         }
     },
     "support": {
@@ -29,7 +47,7 @@
         "handle": "peek",
         "name": "Peek",
         "developer": "justinholtweb",
-        "developerUrl": "https://github.com/justinholtweb",
+        "developerUrl": "https://justinholt.com",
         "developerEmail": "justin@justinholtweb.com",
         "documentationUrl": "https://github.com/justinholtweb/craft-peek",
         "changelogUrl": "https://raw.githubusercontent.com/justinholtweb/craft-peek/main/CHANGELOG.md",

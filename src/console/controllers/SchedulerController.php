@@ -5,7 +5,6 @@ namespace justinholtweb\peek\console\controllers;
 use Craft;
 use craft\console\Controller;
 use justinholtweb\peek\enums\ReleaseStatus;
-use justinholtweb\peek\Plugin;
 use justinholtweb\peek\queue\jobs\PublishReleaseJob;
 use justinholtweb\peek\records\ReleaseRecord;
 use yii\console\ExitCode;
@@ -25,6 +24,7 @@ class SchedulerController extends Controller
     {
         $now = new \DateTime();
 
+        /** @var ReleaseRecord[] $records */
         $records = ReleaseRecord::find()
             ->where(['status' => ReleaseStatus::Scheduled->value])
             ->andWhere(['<=', 'scheduledDate', $now->format('Y-m-d H:i:s')])

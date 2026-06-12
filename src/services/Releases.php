@@ -7,8 +7,8 @@ use craft\db\Query;
 use craft\elements\Entry;
 use justinholtweb\peek\enums\ReleaseStatus;
 use justinholtweb\peek\models\Release;
-use justinholtweb\peek\Plugin;
 use justinholtweb\peek\models\ReleaseEntry;
+use justinholtweb\peek\Plugin;
 use justinholtweb\peek\records\ReleaseEntryRecord;
 use justinholtweb\peek\records\ReleaseRecord;
 use yii\base\Component;
@@ -40,6 +40,7 @@ class Releases extends Component
         }
 
         $releases = [];
+        /** @var ReleaseRecord $record */
         foreach ($query->all() as $record) {
             $releases[] = $this->_populateRelease($record);
         }
@@ -252,9 +253,12 @@ class Releases extends Component
      */
     public function getReleaseEntryRecordsByDraftId(int $draftId): array
     {
-        return ReleaseEntryRecord::find()
+        /** @var ReleaseEntryRecord[] $records */
+        $records = ReleaseEntryRecord::find()
             ->where(['draftId' => $draftId])
             ->all();
+
+        return $records;
     }
 
     /**
@@ -313,6 +317,7 @@ class Releases extends Component
      */
     private function _getEntriesForRelease(int $releaseId): array
     {
+        /** @var ReleaseEntryRecord[] $records */
         $records = ReleaseEntryRecord::find()
             ->where(['releaseId' => $releaseId])
             ->orderBy(['sortOrder' => SORT_ASC])
@@ -341,7 +346,7 @@ class Releases extends Component
         $release->siteId = $record->siteId;
         $release->name = $record->name;
         $release->description = $record->description;
-        $release->status = ReleaseStatus::from($record->status);
+        $release->status = ReleaseStatus::tryFrom($record->status) ?? ReleaseStatus::Draft;
         $release->scheduledDate = $record->scheduledDate ? new \DateTime($record->scheduledDate) : null;
         $release->publishedDate = $record->publishedDate ? new \DateTime($record->publishedDate) : null;
         $release->publishedBy = $record->publishedBy;

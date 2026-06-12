@@ -2,7 +2,6 @@
 
 namespace justinholtweb\peek\services;
 
-use Craft;
 use craft\elements\Entry;
 use yii\base\Component;
 

@@ -2,7 +2,6 @@
 
 namespace justinholtweb\peek\controllers;
 
-use Craft;
 use craft\elements\Entry;
 use craft\web\Controller;
 use justinholtweb\peek\Plugin;
@@ -34,6 +33,7 @@ class DiffController extends Controller
             throw new NotFoundHttpException('Draft not found.');
         }
 
+        /** @var Entry|null $canonical */
         $canonical = $draft->getCanonical();
         if (!$canonical) {
             throw new NotFoundHttpException('Canonical entry not found.');
@@ -66,6 +66,7 @@ class DiffController extends Controller
             throw new NotFoundHttpException('Draft not found.');
         }
 
+        /** @var Entry|null $canonical */
         $canonical = $draft->getCanonical();
         if (!$canonical) {
             throw new NotFoundHttpException('Canonical entry not found.');

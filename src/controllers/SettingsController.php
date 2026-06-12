@@ -15,7 +15,10 @@ class SettingsController extends Controller
             return false;
         }
 
-        $this->requireAdmin(false);
+        // Match the CP nav: admins, or users granted the manage-settings permission.
+        if (!Craft::$app->getUser()->getIsAdmin()) {
+            $this->requirePermission('peek:manageSettings');
+        }
 
         return true;
     }

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 - Unreleased
+## 5.0.0 - 2026-06-12
 
 ### Added
 - Field-by-field diff comparison for drafts vs. live content

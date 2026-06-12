@@ -2,7 +2,6 @@
 
 namespace justinholtweb\peek\controllers;
 
-use Craft;
 use craft\web\Controller;
 use justinholtweb\peek\Plugin;
 use yii\web\Response;

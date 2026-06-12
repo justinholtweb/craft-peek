@@ -1,5 +1,8 @@
 /vendor/
 /node_modules/
+/composer.lock
+/tests/_output/
+/tests/_data/
 .DS_Store
 .idea/
 .vscode/

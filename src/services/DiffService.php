@@ -2,7 +2,6 @@
 
 namespace justinholtweb\peek\services;
 
-use Craft;
 use craft\base\FieldInterface;
 use craft\elements\Asset;
 use craft\elements\Entry;
@@ -14,7 +13,6 @@ use craft\fields\Email as EmailField;
 use craft\fields\Entries as EntriesField;
 use craft\fields\Lightswitch as LightswitchField;
 use craft\fields\Link as LinkField;
-use craft\fields\PlainText;
 use craft\fields\Users as UsersField;
 use Jfcherng\Diff\DiffHelper;
 use justinholtweb\peek\models\FieldDiff;
@@ -73,10 +71,7 @@ class DiffService extends Component
         $fieldLayout = $canonical->getFieldLayout();
         if ($fieldLayout) {
             foreach ($fieldLayout->getCustomFields() as $field) {
-                $fieldDiff = $this->_diffField($field, $draft, $canonical);
-                if ($fieldDiff) {
-                    $diffs[] = $fieldDiff;
-                }
+                $diffs[] = $this->_diffField($field, $draft, $canonical);
             }
         }
 
@@ -96,7 +91,7 @@ class DiffService extends Component
         ];
     }
 
-    private function _diffField(FieldInterface $field, Entry $draft, Entry $canonical): ?FieldDiff
+    private function _diffField(FieldInterface $field, Entry $draft, Entry $canonical): FieldDiff
     {
         $handle = $field->handle;
         $oldValue = $canonical->getFieldValue($handle);

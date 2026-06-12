@@ -60,6 +60,9 @@ class Plugin extends BasePlugin
     public function getCpNavItem(): ?array
     {
         $nav = parent::getCpNavItem();
+        if ($nav === null) {
+            return null;
+        }
         $nav['label'] = 'Peek';
 
         $nav['subnav'] = [];
@@ -105,7 +108,7 @@ class Plugin extends BasePlugin
         Event::on(
             UrlManager::class,
             UrlManager::EVENT_REGISTER_CP_URL_RULES,
-            function (RegisterUrlRulesEvent $event) {
+            function(RegisterUrlRulesEvent $event) {
                 // Dashboard
                 $event->rules['peek'] = 'peek/dashboard/index';
 
@@ -134,7 +137,7 @@ class Plugin extends BasePlugin
         Event::on(
             Drafts::class,
             Drafts::EVENT_BEFORE_APPLY_DRAFT,
-            function (DraftEvent $event) {
+            function(DraftEvent $event) {
                 if ($event->draft) {
                     $this->_applyingDraftIds[] = $event->draft->id;
                     $this->releases->markEntryPublishedByDraftId($event->draft->id);
@@ -146,7 +149,7 @@ class Plugin extends BasePlugin
         Event::on(
             Drafts::class,
             Drafts::EVENT_AFTER_APPLY_DRAFT,
-            function (DraftEvent $event) {
+            function(DraftEvent $event) {
                 if ($event->draft) {
                     $this->_applyingDraftIds = array_diff($this->_applyingDraftIds, [$event->draft->id]);
                 }
@@ -157,7 +160,7 @@ class Plugin extends BasePlugin
         Event::on(
             Elements::class,
             Elements::EVENT_BEFORE_DELETE_ELEMENT,
-            function (DeleteElementEvent $event) {
+            function(DeleteElementEvent $event) {
                 $element = $event->element;
                 if ($element instanceof Entry && $element->getIsDraft()) {
                     // Skip if this draft is being applied (not truly deleted)
@@ -174,11 +177,11 @@ class Plugin extends BasePlugin
             Event::on(
                 Entry::class,
                 Element::EVENT_DEFINE_SIDEBAR_HTML,
-                function (DefineHtmlEvent $event) {
+                function(DefineHtmlEvent $event) {
                     /** @var Entry $entry */
                     $entry = $event->sender;
 
-                    if (!$entry->getIsDraft() || $entry->getIsProvisionalDraft()) {
+                    if (!$entry->getIsDraft() || $entry->isProvisionalDraft) {
                         return;
                     }
 
@@ -190,6 +193,7 @@ class Plugin extends BasePlugin
 
     private function _renderPeekSidebar(Entry $draft): string
     {
+        /** @var Entry|null $canonical */
         $canonical = $draft->getCanonical();
         if (!$canonical || $canonical->id === $draft->id) {
             return '';
@@ -255,7 +259,7 @@ class Plugin extends BasePlugin
         Event::on(
             UserPermissions::class,
             UserPermissions::EVENT_REGISTER_PERMISSIONS,
-            function (RegisterUserPermissionsEvent $event) {
+            function(RegisterUserPermissionsEvent $event) {
                 $event->permissions[] = [
                     'heading' => Craft::t('peek', 'Peek'),
                     'permissions' => [

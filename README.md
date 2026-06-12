@@ -50,6 +50,7 @@ Settings are available in the Craft CP under Peek > Settings, or via `config/pee
 ```php
 return [
     'staleDraftDays' => 14,
+    'defaultSiteId' => null,
     'enableVisualPreview' => true,
     'maxEntriesPerRelease' => 50,
 ];
