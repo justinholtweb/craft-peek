@@ -41,4 +41,32 @@ class ReleaseTest extends Unit
 
         $this->assertSame(1, $release->getEntryCount());
     }
+
+    public function testNameAndSiteIdAreRequired(): void
+    {
+        $release = new Release();
+
+        $this->assertFalse($release->validate());
+        $this->assertArrayHasKey('name', $release->getErrors());
+        $this->assertArrayHasKey('siteId', $release->getErrors());
+    }
+
+    public function testMinimalValidRelease(): void
+    {
+        $release = new Release();
+        $release->name = 'Spring launch';
+        $release->siteId = 1;
+
+        $this->assertTrue($release->validate());
+    }
+
+    public function testNameIsCappedAt255Characters(): void
+    {
+        $release = new Release();
+        $release->name = str_repeat('a', 256);
+        $release->siteId = 1;
+
+        $this->assertFalse($release->validate());
+        $this->assertArrayHasKey('name', $release->getErrors());
+    }
 }

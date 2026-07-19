@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.1 - 2026-07-19
+
+### Changed
+- Expanded automated unit test coverage for the release status state machine, `Release`/`ReleaseEntry`/`Settings` validation, and `DiffService` field-value serialization
+- Added a unit-suite bootstrap so model validation rules can be tested without booting a full Craft application
+
 ## 5.0.0 - 2026-06-12
 
 ### Added

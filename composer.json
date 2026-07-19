@@ -1,7 +1,7 @@
 {
     "name": "justinholtweb/craft-peek",
     "description": "Content staging, visual diff, and coordinated releases for Craft CMS.",
-    "version": "5.0.0",
+    "version": "5.0.1",
     "type": "craft-plugin",
     "license": "proprietary",
     "minimum-stability": "dev",

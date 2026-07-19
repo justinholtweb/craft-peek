@@ -73,4 +73,46 @@ class ReleaseStatusTest extends Unit
         $this->assertSame(ReleaseStatus::Scheduled, ReleaseStatus::from('scheduled'));
         $this->assertSame('published', ReleaseStatus::Published->value);
     }
+
+    public function testTryFromReturnsNullForUnknownValue(): void
+    {
+        $this->assertNull(ReleaseStatus::tryFrom('nonsense'));
+    }
+
+    public function testLabelsAndColorsAreStable(): void
+    {
+        $this->assertSame('Draft', ReleaseStatus::Draft->label());
+        $this->assertSame('grey', ReleaseStatus::Draft->color());
+        $this->assertSame('Published', ReleaseStatus::Published->label());
+        $this->assertSame('green', ReleaseStatus::Published->color());
+        $this->assertSame('Failed', ReleaseStatus::Failed->label());
+        $this->assertSame('red', ReleaseStatus::Failed->color());
+    }
+
+    /**
+     * Locks down the full transition matrix so an accidental edit to one arm of
+     * the state machine can't silently open (or close) a transition.
+     */
+    public function testFullTransitionMatrix(): void
+    {
+        $allowed = [
+            'draft' => ['ready', 'scheduled', 'publishing'],
+            'ready' => ['draft', 'scheduled', 'publishing'],
+            'scheduled' => ['draft', 'ready', 'publishing'],
+            'publishing' => ['published', 'failed'],
+            'published' => [],
+            'failed' => ['draft', 'ready'],
+        ];
+
+        foreach (ReleaseStatus::cases() as $from) {
+            foreach (ReleaseStatus::cases() as $to) {
+                $expected = in_array($to->value, $allowed[$from->value], true);
+                $this->assertSame(
+                    $expected,
+                    $from->canTransitionTo($to),
+                    "Transition {$from->value} -> {$to->value} should be " . ($expected ? 'allowed' : 'denied'),
+                );
+            }
+        }
+    }
 }
