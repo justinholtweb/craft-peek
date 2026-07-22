@@ -36,6 +36,19 @@ enum ReleaseStatus: string
     }
 
     /**
+     * Whether a release in this status still has drafts that can be applied.
+     *
+     * Applying a draft deletes it, so a published release has nothing left to
+     * publish — running it again would be a no-op at best. `Publishing` stays
+     * publishable because the scheduler sets it before queueing the job, and
+     * `Failed` because a rolled-back release still has all of its drafts.
+     */
+    public function isPublishable(): bool
+    {
+        return $this !== self::Published;
+    }
+
+    /**
      * Valid state transitions for releases.
      */
     public function canTransitionTo(self $target): bool

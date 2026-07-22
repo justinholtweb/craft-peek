@@ -1,7 +1,7 @@
 {
     "name": "justinholtweb/craft-peek",
     "description": "Content staging, visual diff, and coordinated releases for Craft CMS.",
-    "version": "5.0.1",
+    "version": "5.0.2",
     "type": "craft-plugin",
     "license": "proprietary",
     "minimum-stability": "dev",
@@ -14,7 +14,11 @@
     "require-dev": {
         "codeception/codeception": "^5.0",
         "craftcms/ecs": "dev-main",
-        "craftcms/phpstan": "dev-main"
+        "craftcms/phpstan": "dev-main",
+        "codeception/module-yii2": "^1.1",
+        "codeception/module-asserts": "^3.0",
+        "codeception/module-datafactory": "^3.0",
+        "vlucas/phpdotenv": "^5.4"
     },
     "autoload": {
         "psr-4": {
@@ -27,7 +31,9 @@
         }
     },
     "scripts": {
-        "test": "codecept run unit",
+        "test": "codecept run",
+        "test-unit": "codecept run unit",
+        "test-integration": "codecept run integration",
         "ecs": "ecs check",
         "ecs-fix": "ecs check --fix",
         "phpstan": "phpstan analyse"

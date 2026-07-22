@@ -163,7 +163,7 @@ class Releases extends Component
     public function validateRelease(Release $release): array
     {
         $errors = [];
-        $entries = $this->_getEntriesForRelease($release->id);
+        $entries = $release->id ? $this->_getEntriesForRelease($release->id) : [];
 
         if (empty($entries)) {
             $errors[] = Craft::t('peek', 'Release has no entries.');
@@ -171,6 +171,15 @@ class Releases extends Component
         }
 
         foreach ($entries as $entry) {
+            // A null draftId means the draft is gone — the FK is SET NULL, so
+            // this is what an already-published (or externally deleted) entry
+            // looks like. Never pass it to an element query: `id(null)` drops
+            // the filter and would match an unrelated draft.
+            if (!$entry->draftId) {
+                $errors[] = Craft::t('peek', 'Entry #{id} no longer has a draft to publish.', ['id' => $entry->canonicalId]);
+                continue;
+            }
+
             $draft = Entry::find()->id($entry->draftId)->drafts(true)->status(null)->one();
             if (!$draft) {
                 $errors[] = Craft::t('peek', 'Draft #{id} no longer exists.', ['id' => $entry->draftId]);
@@ -192,6 +201,12 @@ class Releases extends Component
      */
     public function publishRelease(Release $release): bool
     {
+        // Publishing is terminal. Re-running it would have nothing left to apply,
+        // since applying a draft removes it.
+        if (!$release->status->isPublishable()) {
+            return false;
+        }
+
         $errors = $this->validateRelease($release);
         if (!empty($errors)) {
             return false;
@@ -206,6 +221,10 @@ class Releases extends Component
 
         try {
             foreach ($entries as $entry) {
+                if (!$entry->draftId) {
+                    throw new \RuntimeException("Release entry #{$entry->id} has no draft to apply");
+                }
+
                 $draft = Entry::find()
                     ->id($entry->draftId)
                     ->drafts(true)

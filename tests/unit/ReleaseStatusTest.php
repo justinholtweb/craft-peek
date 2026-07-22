@@ -115,4 +115,28 @@ class ReleaseStatusTest extends Unit
             }
         }
     }
+
+    public function testOnlyPublishedIsUnpublishable(): void
+    {
+        foreach (ReleaseStatus::cases() as $status) {
+            $this->assertSame(
+                $status !== ReleaseStatus::Published,
+                $status->isPublishable(),
+                "{$status->value} publishability",
+            );
+        }
+    }
+
+    public function testFailedReleasesCanBeRetried(): void
+    {
+        // A failed publish is rolled back, so every draft is still there.
+        $this->assertTrue(ReleaseStatus::Failed->isPublishable());
+    }
+
+    public function testPublishingStaysPublishableForTheQueuedJob(): void
+    {
+        // The scheduler flips a release to Publishing before pushing the job,
+        // so the job itself must still be allowed to publish it.
+        $this->assertTrue(ReleaseStatus::Publishing->isPublishable());
+    }
 }
