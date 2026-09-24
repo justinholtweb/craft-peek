@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.0.3 - 2026-09-24
+
+### Fixed
+- The Peek panel in the entry editor sidebar had no padding, so its rows sat flush against the panel edges. It now uses Craft’s native sidebar markup (`<fieldset>` with an `h6` legend and `Cp::metadataHtml()`) and matches the other sidebar sections
+
 ## 5.0.2 - 2026-07-22
 
 ### Fixed

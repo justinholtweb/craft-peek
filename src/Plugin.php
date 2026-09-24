@@ -12,6 +12,8 @@ use craft\events\DeleteElementEvent;
 use craft\events\DraftEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\helpers\Cp;
+use craft\helpers\Html;
 use craft\services\Drafts;
 use craft\services\Elements;
 use craft\services\UserPermissions;
@@ -214,44 +216,26 @@ class Plugin extends BasePlugin
         $cpTrigger = Craft::$app->getConfig()->getGeneral()->cpTrigger;
         $diffUrl = "/{$cpTrigger}/peek/diff/{$draft->id}";
 
-        $html = '<div class="meta">';
-        $html .= '<h2>Peek</h2>';
-
-        // Changed fields count
-        $html .= '<div class="data">';
-        $html .= '<dt>' . Craft::t('peek', 'Fields Changed') . '</dt>';
-        $html .= '<dd>' . $changedCount . '</dd>';
-        $html .= '</div>';
-
-        // Diff link
-        $html .= '<div class="data">';
-        $html .= '<dt>' . Craft::t('peek', 'Diff') . '</dt>';
-        $html .= '<dd><a href="' . $diffUrl . '" class="go">' . Craft::t('peek', 'View Diff') . '</a></dd>';
-        $html .= '</div>';
-
-        // Release membership
         if (!empty($releases)) {
-            $html .= '<div class="data">';
-            $html .= '<dt>' . Craft::t('peek', 'Releases') . '</dt>';
-            $html .= '<dd>';
+            $releasesHtml = '';
             foreach ($releases as $release) {
                 $releaseUrl = "/{$cpTrigger}/peek/releases/{$release->id}";
-                $html .= '<a href="' . $releaseUrl . '">' . htmlspecialchars($release->name) . '</a>';
-                $html .= ' <span class="status ' . $release->status->color() . '"></span>';
-                $html .= '<br>';
+                $releasesHtml .= '<a href="' . $releaseUrl . '">' . Html::encode($release->name) . '</a>';
+                $releasesHtml .= ' <span class="status ' . $release->status->color() . '"></span>';
+                $releasesHtml .= '<br>';
             }
-            $html .= '</dd>';
-            $html .= '</div>';
         } else {
-            $html .= '<div class="data">';
-            $html .= '<dt>' . Craft::t('peek', 'Releases') . '</dt>';
-            $html .= '<dd class="light">' . Craft::t('peek', 'Not in any release') . '</dd>';
-            $html .= '</div>';
+            $releasesHtml = '<span class="light">' . Craft::t('peek', 'Not in any release') . '</span>';
         }
 
-        $html .= '</div>';
-
-        return $html;
+        return Html::tag('fieldset',
+            Html::tag('legend', 'Peek', ['class' => 'h6']) .
+            Cp::metadataHtml([
+                Craft::t('peek', 'Fields Changed') => (string)$changedCount,
+                Craft::t('peek', 'Diff') => '<a href="' . $diffUrl . '" class="go">' . Craft::t('peek', 'View Diff') . '</a>',
+                Craft::t('peek', 'Releases') => $releasesHtml,
+            ])
+        );
     }
 
     private function registerPermissions(): void
