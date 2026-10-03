@@ -5,6 +5,7 @@ namespace justinholtweb\peek\controllers;
 use Craft;
 use craft\web\Controller;
 use justinholtweb\peek\Plugin;
+use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 class SettingsController extends Controller
@@ -36,6 +37,12 @@ class SettingsController extends Controller
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
+
+        // Plugin settings are project config. Where admin changes are off they arrive by deploy,
+        // and a save here would drift from what the next deploy applies.
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Peek’s settings can’t be changed on an environment that doesn’t allow admin changes.');
+        }
 
         $plugin = Plugin::getInstance();
         $settings = $plugin->getSettings();

@@ -2,7 +2,9 @@
 
 namespace justinholtweb\peek\services;
 
+use Craft;
 use craft\elements\Entry;
+use craft\elements\User;
 use yii\base\Component;
 
 class DraftService extends Component
@@ -12,7 +14,7 @@ class DraftService extends Component
      *
      * @return Entry[]
      */
-    public function getAllPendingDrafts(?int $siteId = null): array
+    public function getAllPendingDrafts(?int $siteId = null, ?User $viewer = null): array
     {
         $query = Entry::find()
             ->drafts(true)
@@ -25,7 +27,7 @@ class DraftService extends Component
             $query->siteId($siteId);
         }
 
-        return $query->all();
+        return $this->visibleTo($query->all(), $viewer);
     }
 
     /**
@@ -33,9 +35,9 @@ class DraftService extends Component
      *
      * @return array<string, int>
      */
-    public function getDraftCountsBySection(?int $siteId = null): array
+    public function getDraftCountsBySection(?int $siteId = null, ?User $viewer = null): array
     {
-        $drafts = $this->getAllPendingDrafts($siteId);
+        $drafts = $this->getAllPendingDrafts($siteId, $viewer);
         $counts = [];
 
         foreach ($drafts as $draft) {
@@ -55,7 +57,7 @@ class DraftService extends Component
      *
      * @return Entry[]
      */
-    public function getStaleDrafts(int $days, ?int $siteId = null): array
+    public function getStaleDrafts(int $days, ?int $siteId = null, ?User $viewer = null): array
     {
         $cutoff = (new \DateTime())->modify("-{$days} days");
 
@@ -71,6 +73,30 @@ class DraftService extends Component
             $query->siteId($siteId);
         }
 
-        return $query->all();
+        return $this->visibleTo($query->all(), $viewer);
+    }
+
+    /**
+     * With a viewer, only the drafts they could open in Craft's editor. The dashboard lists other
+     * people's drafts by title and section, which is itself content.
+     *
+     * @param Entry[] $drafts
+     * @return Entry[]
+     */
+    private function visibleTo(array $drafts, ?User $viewer): array
+    {
+        $elements = Craft::$app->getElements();
+
+        return array_values(array_filter($drafts, function(Entry $draft) use ($elements, $viewer) {
+            // A draft whose section has gone (soft-deleted, or removed by a project config apply)
+            // throws from getSection(), and one such draft took the whole dashboard down.
+            try {
+                $draft->getSection();
+            } catch (\yii\base\InvalidConfigException) {
+                return false;
+            }
+
+            return $viewer === null || $elements->canView($draft, $viewer);
+        }));
     }
 }

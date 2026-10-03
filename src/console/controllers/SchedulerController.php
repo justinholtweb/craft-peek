@@ -4,6 +4,7 @@ namespace justinholtweb\peek\console\controllers;
 
 use Craft;
 use craft\console\Controller;
+use craft\helpers\Db;
 use justinholtweb\peek\enums\ReleaseStatus;
 use justinholtweb\peek\queue\jobs\PublishReleaseJob;
 use justinholtweb\peek\records\ReleaseRecord;
@@ -27,7 +28,8 @@ class SchedulerController extends Controller
         /** @var ReleaseRecord[] $records */
         $records = ReleaseRecord::find()
             ->where(['status' => ReleaseStatus::Scheduled->value])
-            ->andWhere(['<=', 'scheduledDate', $now->format('Y-m-d H:i:s')])
+            // Release dates are stored in UTC.
+            ->andWhere(['<=', 'scheduledDate', Db::prepareDateForDb($now)])
             ->all();
 
         if (empty($records)) {

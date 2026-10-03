@@ -13,7 +13,8 @@ use craft\db\ActiveRecord;
  * @property string|null $scheduledDate
  * @property string|null $publishedDate
  * @property int|null $publishedBy
- * @property int $createdBy
+ * @property int|null $createdBy
+ * @property int|null $scheduledBy
  * @property string $dateCreated
  * @property string $dateUpdated
  * @property string $uid

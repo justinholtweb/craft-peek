@@ -282,3 +282,26 @@ src/
 4. **`jfcherng/php-diff` SideBySide renderer** — word-level diff with 3 lines of context. CKEditor content is stripped of HTML before diffing. Relations are serialized to `"Title (#id)"` per line.
 
 5. **Cron-based scheduling** — `peek/scheduler/check` runs every minute, queries overdue scheduled releases, pushes `PublishReleaseJob` to Craft's queue. The job is processed by `craft queue/run` or Craft's queue listener.
+
+6. **Releases act as a person (5.0.4)** — every draft is checked with `Elements::canSave($draft)` + `canSaveCanonical($draft)`, the same pair Craft's `elements/apply-draft` checks: when it's added, and again at publish (`publishRelease($release, $user)`). The queue job publishes as `scheduledBy` (fallback `createdBy`), re-checking their current permissions and `peek:scheduleReleases`. Calling the service with no user is trusted code.
+
+7. **The release screen is one form** — `fullPageForm`, so every secondary action is a `.formsubmit` button with `data-action`/`data-params`. Never nest a `<form>`: the browser drops it and its `action` input joins the main form, where PHP keeps the last one (that was `delete`, so Save deleted the release).
+
+8. **Dates are UTC** — `Db::prepareDateForDb()` in, `DateTimeHelper::toDateTime()` out, scheduler compares in UTC.
+
+## Traps
+
+- **Craft 5.11 added a static `Controller::currentUser()`.** A private instance method of that name is a fatal on load ("Cannot make static method … non static"); Peek's own vendor Craft (5.10) doesn't have it, so only the harness caught it.
+- **`getSection()` throws on a draft whose section is gone.** List code filters those out.
+- **`Model::validate()` clears errors**, so `saveRelease()` after `addErrors()` loses them — add errors after saving.
+
+## Testing
+
+```sh
+# Codeception (unit + integration) from the PHP 8.4 runner, against a throwaway DB on the harness MySQL
+docker exec ddev-plugin-testing-db mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS craft_peek_test"
+docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 152 tests
+
+# Controllers and screens over HTTP, in the plugin-testing harness
+docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/security.php   # 17 checks
+```

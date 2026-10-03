@@ -1,7 +1,7 @@
 {
     "name": "justinholtweb/craft-peek",
     "description": "Content staging, visual diff, and coordinated releases for Craft CMS.",
-    "version": "5.0.3",
+    "version": "5.0.4",
     "type": "craft-plugin",
     "license": "proprietary",
     "minimum-stability": "dev",
@@ -18,7 +18,8 @@
         "codeception/module-yii2": "^1.1",
         "codeception/module-asserts": "^3.0",
         "codeception/module-datafactory": "^3.0",
-        "vlucas/phpdotenv": "^5.4"
+        "vlucas/phpdotenv": "^5.4",
+        "phpstan/phpstan": "^1.12 || ^2.2"
     },
     "autoload": {
         "psr-4": {

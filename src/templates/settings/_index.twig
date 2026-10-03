@@ -3,11 +3,16 @@
 
 {% set title = 'Peek Settings'|t('peek') %}
 {% set selectedSubnavItem = 'settings' %}
-{% set fullPageForm = true %}
+{% set readOnly = not craft.app.config.general.allowAdminChanges %}
+{% set fullPageForm = not readOnly %}
 
 {% block pluginContent %}
     <input type="hidden" name="action" value="peek/settings/save">
     {{ redirectInput('peek/settings') }}
+
+    {% if readOnly %}
+        <p class="warning with-icon">{{ 'Settings can only be changed where admin changes are allowed. They come from project config here.'|t('peek') }}</p>
+    {% endif %}
 
     <div id="fields">
         <h2>{{ 'General'|t('peek') }}</h2>

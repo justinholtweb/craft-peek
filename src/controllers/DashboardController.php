@@ -2,6 +2,7 @@
 
 namespace justinholtweb\peek\controllers;
 
+use Craft;
 use craft\web\Controller;
 use justinholtweb\peek\Plugin;
 use yii\web\Response;
@@ -25,9 +26,11 @@ class DashboardController extends Controller
         $draftService = Plugin::getInstance()->drafts;
         $releasesService = Plugin::getInstance()->releases;
 
-        $drafts = $draftService->getAllPendingDrafts();
-        $staleDrafts = $draftService->getStaleDrafts($settings->staleDraftDays);
-        $draftCountsBySection = $draftService->getDraftCountsBySection();
+        $viewer = Craft::$app->getUser()->getIdentity();
+
+        $drafts = $draftService->getAllPendingDrafts(null, $viewer);
+        $staleDrafts = $draftService->getStaleDrafts($settings->staleDraftDays, null, $viewer);
+        $draftCountsBySection = $draftService->getDraftCountsBySection(null, $viewer);
         $releases = $releasesService->getAllReleases();
 
         $activeReleases = array_filter($releases, fn($r) => !in_array($r->status->value, ['published', 'failed']));

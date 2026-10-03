@@ -5,6 +5,9 @@ namespace justinholtweb\peek\services;
 use Craft;
 use craft\db\Query;
 use craft\elements\Entry;
+use craft\elements\User;
+use craft\helpers\DateTimeHelper;
+use craft\helpers\Db;
 use justinholtweb\peek\enums\ReleaseStatus;
 use justinholtweb\peek\models\Release;
 use justinholtweb\peek\models\ReleaseEntry;
@@ -67,10 +70,12 @@ class Releases extends Component
         $record->name = $release->name;
         $record->description = $release->description;
         $record->status = $release->status->value;
-        $record->scheduledDate = $release->scheduledDate?->format('Y-m-d H:i:s');
-        $record->publishedDate = $release->publishedDate?->format('Y-m-d H:i:s');
+        // UTC, like every other date Craft stores — the scheduler compares against UTC now.
+        $record->scheduledDate = Db::prepareDateForDb($release->scheduledDate);
+        $record->publishedDate = Db::prepareDateForDb($release->publishedDate);
         $record->publishedBy = $release->publishedBy;
         $record->createdBy = $release->createdBy;
+        $record->scheduledBy = $release->scheduledBy;
 
         if (!$record->save()) {
             $release->addErrors($record->getErrors());
@@ -79,8 +84,8 @@ class Releases extends Component
 
         $release->id = $record->id;
         $release->uid = $record->uid;
-        $release->dateCreated = $record->dateCreated ? new \DateTime($record->dateCreated) : null;
-        $release->dateUpdated = $record->dateUpdated ? new \DateTime($record->dateUpdated) : null;
+        $release->dateCreated = DateTimeHelper::toDateTime($record->dateCreated) ?: null;
+        $release->dateUpdated = DateTimeHelper::toDateTime($record->dateUpdated) ?: null;
 
         return true;
     }
@@ -98,6 +103,21 @@ class Releases extends Component
 
     public function addEntryToRelease(int $releaseId, int $canonicalId, int $draftId): bool
     {
+        // The draft decides which entry it belongs to. Before 5.0.4 the canonical ID was taken as
+        // given, so a release could record one entry while applying a draft of another, and a
+        // provisional draft (someone's unsaved edits) could be published from under them.
+        $draft = Entry::find()->id($draftId)->drafts(true)->provisionalDrafts(null)->status(null)->site('*')->one();
+
+        if ($draft === null || $draft->isProvisionalDraft || $draft->getCanonicalId() !== $canonicalId) {
+            return false;
+        }
+
+        $release = $this->getReleaseById($releaseId);
+
+        if ($release === null || !$this->isEditable($release)) {
+            return false;
+        }
+
         $entry = new ReleaseEntry();
 
         // Check for duplicate
@@ -143,6 +163,12 @@ class Releases extends Component
 
     public function removeEntryFromRelease(int $releaseId, int $draftId): bool
     {
+        $release = $this->getReleaseById($releaseId);
+
+        if ($release === null || !$this->isEditable($release)) {
+            return false;
+        }
+
         $record = ReleaseEntryRecord::findOne([
             'releaseId' => $releaseId,
             'draftId' => $draftId,
@@ -196,10 +222,58 @@ class Releases extends Component
     }
 
     /**
+     * Whether a release's contents and settings can still change. Once it is publishing or
+     * published, its entries are history.
+     */
+    public function isEditable(Release $release): bool
+    {
+        return !in_array($release->status, [ReleaseStatus::Publishing, ReleaseStatus::Published], true);
+    }
+
+    /**
+     * The drafts in a release that `$user` could not publish through Craft's own editor —
+     * the same two checks Craft's "apply draft" action makes: save the draft, and save the
+     * entry it belongs to.
+     *
+     * @return string[] One message per draft the user may not apply; empty if they may apply them all.
+     */
+    public function unauthorizedEntries(Release $release, User $user): array
+    {
+        $elements = Craft::$app->getElements();
+        $errors = [];
+
+        foreach ($release->id ? $this->_getEntriesForRelease($release->id) : [] as $entry) {
+            if (!$entry->draftId) {
+                continue;
+            }
+
+            $draft = Entry::find()->id($entry->draftId)->drafts(true)->provisionalDrafts(null)->status(null)->site('*')->one();
+
+            if ($draft === null) {
+                continue;
+            }
+
+            if (!$elements->canSave($draft, $user) || !$elements->canSaveCanonical($draft, $user)) {
+                $errors[] = Craft::t('peek', '{user} isn’t allowed to publish “{title}”.', [
+                    'user' => $user->getName(),
+                    'title' => $draft->title ?? "#{$draft->id}",
+                ]);
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
      * Publish all entries in a release atomically.
      * All drafts are applied within a DB transaction — all succeed or none do.
+     *
+     * With `$user`, every draft must be one that user could apply in Craft's own editor, or
+     * nothing is published and the reasons are added to the release's `entries` errors. The
+     * controller passes the signed-in user and the queue job the user who scheduled the release.
+     * Without one, the caller is trusted — code calling the service directly.
      */
-    public function publishRelease(Release $release): bool
+    public function publishRelease(Release $release, ?User $user = null): bool
     {
         // Publishing is terminal. Re-running it would have nothing left to apply,
         // since applying a draft removes it.
@@ -208,7 +282,24 @@ class Releases extends Component
         }
 
         $errors = $this->validateRelease($release);
+
+        if (empty($errors) && $user !== null) {
+            $errors = $this->unauthorizedEntries($release, $user);
+        }
+
         if (!empty($errors)) {
+            Craft::warning("Release #{$release->id} was not published: " . implode(' ', $errors), 'peek');
+
+            // The scheduler sets Publishing before queueing the job. Left there, a refused
+            // release could never be edited, rescheduled or published again.
+            if ($release->status === ReleaseStatus::Publishing) {
+                $release->status = ReleaseStatus::Failed;
+                $this->saveRelease($release);
+            }
+
+            // After the save: validate() clears a model's errors.
+            $release->addErrors(['entries' => $errors]);
+
             return false;
         }
 
@@ -248,7 +339,7 @@ class Releases extends Component
             // Mark release as published
             $release->status = ReleaseStatus::Published;
             $release->publishedDate = new \DateTime();
-            $release->publishedBy = Craft::$app->getUser()->getId();
+            $release->publishedBy = $user->id ?? Craft::$app->getUser()->getId();
             $this->saveRelease($release);
 
             $transaction->commit();
@@ -366,12 +457,14 @@ class Releases extends Component
         $release->name = $record->name;
         $release->description = $record->description;
         $release->status = ReleaseStatus::tryFrom($record->status) ?? ReleaseStatus::Draft;
-        $release->scheduledDate = $record->scheduledDate ? new \DateTime($record->scheduledDate) : null;
-        $release->publishedDate = $record->publishedDate ? new \DateTime($record->publishedDate) : null;
+        // Stored as UTC; toDateTime() reads a bare string as UTC.
+        $release->scheduledDate = DateTimeHelper::toDateTime($record->scheduledDate) ?: null;
+        $release->publishedDate = DateTimeHelper::toDateTime($record->publishedDate) ?: null;
         $release->publishedBy = $record->publishedBy;
         $release->createdBy = $record->createdBy;
-        $release->dateCreated = $record->dateCreated ? new \DateTime($record->dateCreated) : null;
-        $release->dateUpdated = $record->dateUpdated ? new \DateTime($record->dateUpdated) : null;
+        $release->scheduledBy = $record->scheduledBy;
+        $release->dateCreated = DateTimeHelper::toDateTime($record->dateCreated) ?: null;
+        $release->dateUpdated = DateTimeHelper::toDateTime($record->dateUpdated) ?: null;
         $release->uid = $record->uid;
 
         $release->setEntries($this->_getEntriesForRelease($release->id));

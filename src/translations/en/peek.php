@@ -107,4 +107,15 @@ return [
 
     // Queue
     'Publishing release #{id}' => 'Publishing release #{id}',
+    'A scheduled release needs a date.' => 'A scheduled release needs a date.',
+    'Add' => 'Add',
+    'Add to Release' => 'Add to Release',
+    'Choose a draft…' => 'Choose a draft…',
+    'Entry #{id}' => 'Entry #{id}',
+    'Entry #{id} no longer has a draft to publish.' => 'Entry #{id} no longer has a draft to publish.',
+    'Publish every draft in this release now?' => 'Publish every draft in this release now?',
+    'Settings can only be changed where admin changes are allowed. They come from project config here.' => 'Settings can only be changed where admin changes are allowed. They come from project config here.',
+    'The release wasn’t published.' => 'The release wasn’t published.',
+    'There are no other drafts you can add. A draft can be added by anyone who could publish it.' => 'There are no other drafts you can add. A draft can be added by anyone who could publish it.',
+    '{user} isn’t allowed to publish “{title}”.' => '{user} isn’t allowed to publish “{title}”.',
 ];

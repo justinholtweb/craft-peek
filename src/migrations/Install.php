@@ -36,6 +36,7 @@ class Install extends Migration
             'publishedDate' => $this->dateTime()->null(),
             'publishedBy' => $this->integer()->null(),
             'createdBy' => $this->integer()->null(),
+            'scheduledBy' => $this->integer()->null(),
             'dateCreated' => $this->dateTime()->notNull(),
             'dateUpdated' => $this->dateTime()->notNull(),
             'uid' => $this->uid(),
@@ -76,6 +77,8 @@ class Install extends Migration
         $this->addForeignKey(null, '{{%peek_releases}}', ['publishedBy'], '{{%users}}', ['id'], 'SET NULL', null);
         // Releases → users (createdBy)
         $this->addForeignKey(null, '{{%peek_releases}}', ['createdBy'], '{{%users}}', ['id'], 'SET NULL', null);
+        // Releases → users (scheduledBy) — whose permissions a scheduled publish runs with
+        $this->addForeignKey(null, '{{%peek_releases}}', ['scheduledBy'], '{{%users}}', ['id'], 'SET NULL', null);
 
         // Release Entries → releases
         $this->addForeignKey(null, '{{%peek_release_entries}}', ['releaseId'], '{{%peek_releases}}', ['id'], 'CASCADE', null);

@@ -17,6 +17,12 @@ class Release extends Model
     public ?DateTime $publishedDate = null;
     public ?int $publishedBy = null;
     public ?int $createdBy = null;
+
+    /**
+     * The user who scheduled the release. A scheduled publish runs in the queue with no one
+     * signed in, so it is authorized as this user.
+     */
+    public ?int $scheduledBy = null;
     public ?DateTime $dateCreated = null;
     public ?DateTime $dateUpdated = null;
     public ?string $uid = null;
@@ -30,7 +36,7 @@ class Release extends Model
             [['name', 'siteId'], 'required'],
             [['name'], 'string', 'max' => 255],
             [['description'], 'string'],
-            [['siteId', 'publishedBy', 'createdBy'], 'integer'],
+            [['siteId', 'publishedBy', 'createdBy', 'scheduledBy'], 'integer'],
         ];
     }
 

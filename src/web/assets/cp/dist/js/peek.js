@@ -2,8 +2,8 @@
 (function () {
     'use strict';
 
-    // Confirm actions (delete buttons, etc.)
-    document.querySelectorAll('[data-confirm]').forEach(function (el) {
+    // Confirm actions. Craft confirms `.formsubmit` buttons itself, so they are left to it.
+    document.querySelectorAll('[data-confirm]:not(.formsubmit)').forEach(function (el) {
         el.addEventListener('click', function (e) {
             if (!confirm(el.dataset.confirm)) {
                 e.preventDefault();

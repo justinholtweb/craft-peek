@@ -124,8 +124,11 @@ class PluginEventsTest extends PeekTestCase
      * The sidebar panel is built by hand rather than through a template, so its
      * escaping and its "not in any release" branch are worth pinning down.
      */
-    private function renderSidebar(\craft\elements\Entry $draft): string
+    private function renderSidebar(\craft\elements\Entry $draft, ?\craft\elements\User $as = null): string
     {
+        // The panel only shows what the signed-in user may use, so sign someone in.
+        \Craft::$app->getUser()->setIdentity($as ?? \craft\elements\User::find()->id($this->adminId())->one());
+
         $method = new \ReflectionMethod(Plugin::getInstance(), '_renderPeekSidebar');
         $method->setAccessible(true);
 
@@ -170,6 +173,22 @@ class PluginEventsTest extends PeekTestCase
 
         $this->assertStringNotContainsString('<script>', $html);
         $this->assertStringContainsString('&lt;script&gt;', $html);
+    }
+
+    public function testSidebarIsEmptyForSomeoneWithoutPeekAccess(): void
+    {
+        $this->releaseWithDraft();
+        $user = new \craft\elements\User(['username' => 'no-peek', 'email' => 'no-peek@example.com']);
+        $this->assertTrue(\Craft::$app->getElements()->saveElement($user, false));
+
+        $this->assertSame('', $this->renderSidebar($this->draft, $user));
+    }
+
+    public function testSidebarUsesCpUrlsWhateverTheCpTrigger(): void
+    {
+        $this->releaseWithDraft();
+
+        $this->assertStringContainsString(\craft\helpers\UrlHelper::cpUrl("peek/diff/{$this->draft->id}"), $this->renderSidebar($this->draft));
     }
 
     public function testPermissionsAreRegistered(): void

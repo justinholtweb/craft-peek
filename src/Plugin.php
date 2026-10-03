@@ -7,6 +7,7 @@ use craft\base\Element;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\elements\Entry;
+use craft\elements\User;
 use craft\events\DefineHtmlEvent;
 use craft\events\DeleteElementEvent;
 use craft\events\DraftEvent;
@@ -14,10 +15,12 @@ use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
 use craft\helpers\Cp;
 use craft\helpers\Html;
+use craft\helpers\UrlHelper;
 use craft\services\Drafts;
 use craft\services\Elements;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
+use justinholtweb\peek\models\Release;
 use justinholtweb\peek\models\Settings;
 use justinholtweb\peek\services\DiffService;
 use justinholtweb\peek\services\DraftService;
@@ -35,7 +38,7 @@ use yii\base\Event;
  */
 class Plugin extends BasePlugin
 {
-    public string $schemaVersion = '1.0.0';
+    public string $schemaVersion = '1.0.1';
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
 
@@ -195,46 +198,103 @@ class Plugin extends BasePlugin
 
     private function _renderPeekSidebar(Entry $draft): string
     {
-        /** @var Entry|null $canonical */
+        /** @var Entry $canonical */
         $canonical = $draft->getCanonical();
-        if (!$canonical || $canonical->id === $draft->id) {
+        if ($canonical->id === $draft->id) {
             return '';
         }
 
-        // Count changed fields
-        $diffs = $this->diff->diffEntry($draft, $canonical);
-        $changedCount = 0;
-        foreach ($diffs as $diff) {
-            if ($diff->hasChanges) {
-                $changedCount++;
-            }
+        $user = Craft::$app->getUser()->getIdentity();
+        if ($user === null || !$user->can('peek:accessPlugin')) {
+            return '';
         }
 
-        // Check release membership
-        $releases = $this->releases->getReleasesForDraft($draft->id);
+        $meta = [];
 
-        $cpTrigger = Craft::$app->getConfig()->getGeneral()->cpTrigger;
-        $diffUrl = "/{$cpTrigger}/peek/diff/{$draft->id}";
-
-        if (!empty($releases)) {
-            $releasesHtml = '';
-            foreach ($releases as $release) {
-                $releaseUrl = "/{$cpTrigger}/peek/releases/{$release->id}";
-                $releasesHtml .= '<a href="' . $releaseUrl . '">' . Html::encode($release->name) . '</a>';
-                $releasesHtml .= ' <span class="status ' . $release->status->color() . '"></span>';
-                $releasesHtml .= '<br>';
+        if ($user->can('peek:viewDiffs')) {
+            $changedCount = 0;
+            foreach ($this->diff->diffEntry($draft, $canonical) as $diff) {
+                if ($diff->hasChanges) {
+                    $changedCount++;
+                }
             }
-        } else {
-            $releasesHtml = '<span class="light">' . Craft::t('peek', 'Not in any release') . '</span>';
+
+            $meta[Craft::t('peek', 'Fields Changed')] = (string)$changedCount;
+            $meta[Craft::t('peek', 'Diff')] = Html::a(Craft::t('peek', 'View Diff'), UrlHelper::cpUrl("peek/diff/{$draft->id}"), ['class' => 'go']);
+        }
+
+        if ($user->can('peek:manageReleases')) {
+            $releases = $this->releases->getReleasesForDraft($draft->id);
+            $releasesHtml = '';
+
+            foreach ($releases as $release) {
+                $releasesHtml .= Html::a(Html::encode($release->name), UrlHelper::cpUrl("peek/releases/{$release->id}"))
+                    . ' <span class="status ' . $release->status->color() . '"></span><br>';
+            }
+
+            if ($releasesHtml === '') {
+                $releasesHtml = '<span class="light">' . Craft::t('peek', 'Not in any release') . '</span>';
+            }
+
+            $meta[Craft::t('peek', 'Releases')] = $releasesHtml . $this->_addToReleaseHtml($draft, $releases, $user);
+        }
+
+        if ($meta === []) {
+            return '';
         }
 
         return Html::tag('fieldset',
             Html::tag('legend', 'Peek', ['class' => 'h6']) .
-            Cp::metadataHtml([
-                Craft::t('peek', 'Fields Changed') => (string)$changedCount,
-                Craft::t('peek', 'Diff') => '<a href="' . $diffUrl . '" class="go">' . Craft::t('peek', 'View Diff') . '</a>',
-                Craft::t('peek', 'Releases') => $releasesHtml,
-            ])
+            Cp::metadataHtml($meta)
+        );
+    }
+
+    /**
+     * A picker for the open releases this draft isn't in yet. The sidebar sits inside the entry's
+     * own form, so it posts with `Craft.sendActionRequest()` rather than a form of its own.
+     *
+     * @param Release[] $current
+     */
+    private function _addToReleaseHtml(Entry $draft, array $current, User $user): string
+    {
+        $elements = Craft::$app->getElements();
+        if (!$elements->canSave($draft, $user) || !$elements->canSaveCanonical($draft, $user)) {
+            return '';
+        }
+
+        $currentIds = array_map(fn(Release $release) => $release->id, $current);
+        $options = [];
+
+        foreach ($this->releases->getAllReleases() as $release) {
+            if ($this->releases->isEditable($release) && !in_array($release->id, $currentIds, true)) {
+                $options[] = Html::tag('option', Html::encode($release->name), ['value' => $release->id]);
+            }
+        }
+
+        if ($options === []) {
+            return '';
+        }
+
+        $id = 'peek-add-' . $draft->id;
+        $view = Craft::$app->getView();
+        $view->registerJsWithVars(fn($id, $draftId, $added) => <<<JS
+(() => {
+    const wrap = document.getElementById($id);
+    if (!wrap) return;
+    wrap.querySelector('button').addEventListener('click', () => {
+        const releaseId = wrap.querySelector('select').value;
+        if (!releaseId) return;
+        Craft.sendActionRequest('POST', 'peek/releases/add-entry', {data: {releaseId, draftId: $draftId}})
+            .then(() => { Craft.cp.displaySuccess($added); window.location.reload(); })
+            .catch(({response}) => Craft.cp.displayError(response?.data?.message));
+    });
+})();
+JS, [$id, $draft->id, Craft::t('peek', 'Entry added to release.')]);
+
+        return Html::tag('div',
+            Html::tag('div', Html::tag('select', implode('', $options)), ['class' => 'select small']) .
+            Html::button(Craft::t('peek', 'Add'), ['type' => 'button', 'class' => 'btn small']),
+            ['id' => $id, 'class' => 'flex mt-xs']
         );
     }
 
