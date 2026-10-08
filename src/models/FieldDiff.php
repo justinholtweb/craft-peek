@@ -14,6 +14,9 @@ class FieldDiff extends Model
     public ?string $diffHtml = null;
     public bool $hasChanges = false;
 
+    /** Set when the field's value couldn't be read or compared. */
+    public ?string $error = null;
+
     public function defineRules(): array
     {
         return [

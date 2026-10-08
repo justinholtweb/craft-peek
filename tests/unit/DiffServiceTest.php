@@ -3,6 +3,7 @@
 namespace justinholtweb\peek\tests\unit;
 
 use Codeception\Test\Unit;
+use craft\base\Model;
 use craft\fields\Date as DateField;
 use craft\fields\Email as EmailField;
 use craft\fields\Lightswitch as LightswitchField;
@@ -177,6 +178,34 @@ class DiffServiceTest extends Unit
         };
 
         $this->assertSame('Hi there', $this->serialize(new PlainText(), $value));
+    }
+
+    public function testModelValuesWithoutToStringSerializeAsJson(): void
+    {
+        // SEOmatic's SEO Settings field returns a MetaBundle model like this (issue #1)
+        $value = new class() extends Model {
+            public string $seoTitle = 'Home';
+            public array $robots = ['index', 'follow'];
+        };
+
+        $result = $this->serialize(new PlainText(), $value);
+
+        $this->assertSame(['seoTitle' => 'Home', 'robots' => ['index', 'follow']], json_decode($result, true));
+    }
+
+    public function testPlainObjectValuesSerializeTheirPublicProperties(): void
+    {
+        $value = new class() {
+            public string $a = 'x';
+            private string $hidden = 'y';
+        };
+
+        $this->assertSame(['a' => 'x'], json_decode($this->serialize(new PlainText(), $value), true));
+    }
+
+    public function testUnencodableValuesSerializeWithoutThrowing(): void
+    {
+        $this->assertIsString($this->serialize(new PlainText(), ['bad' => "\xB1\x31", 'nan' => NAN]));
     }
 
     private function serialize(mixed $field, mixed $value): string

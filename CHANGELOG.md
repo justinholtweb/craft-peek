@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.0.5 - 2026-10-08
+
+### Fixed
+- The diff screen threw an error on entries with a field whose value is an object with no string form, such as SEOmatic’s SEO Settings field (`MetaBundle could not be converted to string`) ([#1](https://github.com/justinholtweb/craft-peek/issues/1)). Such values are now compared as JSON, and a field that still can’t be read is shown as “This field can’t be compared” instead of taking down the screen
+
 ## 5.0.4 - 2026-10-02
 
 ### Security

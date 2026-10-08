@@ -1,15 +1,21 @@
-<div class="peek-field-diff {{ diff.hasChanges ? 'has-changes' : 'no-changes' }}">
+<div class="peek-field-diff {{ diff.error ? 'has-error' : (diff.hasChanges ? 'has-changes' : 'no-changes') }}">
     <div class="peek-field-diff-header">
         <strong>{{ diff.label }}</strong>
         <span class="peek-field-handle">({{ diff.handle }})</span>
-        {% if diff.hasChanges %}
+        {% if diff.error %}
+            <span class="status" title="{{ diff.error }}"></span>
+        {% elseif diff.hasChanges %}
             <span class="status yellow" title="{{ 'Changed'|t('peek') }}"></span>
         {% else %}
             <span class="status green" title="{{ 'Unchanged'|t('peek') }}"></span>
         {% endif %}
     </div>
 
-    {% if diff.hasChanges and diff.diffHtml %}
+    {% if diff.error %}
+        <div class="peek-field-diff-body">
+            <p class="light">{{ diff.error }}</p>
+        </div>
+    {% elseif diff.hasChanges and diff.diffHtml %}
         <div class="peek-field-diff-body">
             {{ diff.diffHtml|raw }}
         </div>

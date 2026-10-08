@@ -62,6 +62,10 @@
     cursor: default;
 }
 
+.peek-field-diff.has-error .peek-field-diff-body p {
+    margin: 0;
+}
+
 .peek-field-handle {
     color: var(--light-text-color, #8f98a3);
     font-size: 12px;

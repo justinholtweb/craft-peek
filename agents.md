@@ -294,6 +294,7 @@ src/
 - **Craft 5.11 added a static `Controller::currentUser()`.** A private instance method of that name is a fatal on load ("Cannot make static method … non static"); Peek's own vendor Craft (5.10) doesn't have it, so only the harness caught it.
 - **`getSection()` throws on a draft whose section is gone.** List code filters those out.
 - **`Model::validate()` clears errors**, so `saveRelease()` after `addErrors()` loses them — add errors after saving.
+- **Third-party field values can be any object.** SEOmatic returns a `MetaBundle` model with no `__toString()` (issue #1). `_fieldValueToString()` must never cast an unknown object to string; models go through `toArray()`, the rest through JSON, and `diffEntry()` catches per field.
 
 ## Testing
 

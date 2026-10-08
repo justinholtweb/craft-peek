@@ -2,6 +2,7 @@
 
 namespace justinholtweb\peek\services;
 
+use Craft;
 use craft\base\FieldInterface;
 use craft\elements\Asset;
 use craft\elements\Entry;
@@ -16,6 +17,7 @@ use craft\fields\Link as LinkField;
 use craft\fields\Users as UsersField;
 use Jfcherng\Diff\DiffHelper;
 use justinholtweb\peek\models\FieldDiff;
+use yii\base\Arrayable;
 use yii\base\Component;
 
 class DiffService extends Component
@@ -71,7 +73,13 @@ class DiffService extends Component
         $fieldLayout = $canonical->getFieldLayout();
         if ($fieldLayout) {
             foreach ($fieldLayout->getCustomFields() as $field) {
-                $diffs[] = $this->_diffField($field, $draft, $canonical);
+                try {
+                    $diffs[] = $this->_diffField($field, $draft, $canonical);
+                } catch (\Throwable $e) {
+                    // A third-party field we can't serialize shouldn't take down the whole diff
+                    Craft::warning("Couldn't diff field \"{$field->handle}\": {$e->getMessage()}", __METHOD__);
+                    $diffs[] = $this->_unreadableFieldDiff($field);
+                }
             }
         }
 
@@ -119,6 +127,20 @@ class DiffService extends Component
                 $diff->diffHtml = $this->_renderTextDiff($oldStr, $newStr);
             }
         }
+
+        return $diff;
+    }
+
+    private function _unreadableFieldDiff(FieldInterface $field): FieldDiff
+    {
+        $diff = new FieldDiff();
+        $diff->handle = $field->handle;
+        $diff->label = $field->name;
+        $diff->type = get_class($field);
+        $diff->oldValue = '';
+        $diff->newValue = '';
+        $diff->hasChanges = false;
+        $diff->error = Craft::t('peek', 'This field can’t be compared.');
 
         return $diff;
     }
@@ -207,12 +229,27 @@ class DiffService extends Component
             return strip_tags($html);
         }
 
-        // Arrays (Matrix, table fields, etc.)
-        if (is_array($value)) {
-            return json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        // Models from third-party fields (e.g. SEOmatic's MetaBundle) have no __toString
+        if ($value instanceof Arrayable) {
+            return $this->_toJson($value->toArray());
+        }
+
+        // Arrays (Matrix, table fields, etc.), JsonSerializable and plain objects
+        if (is_array($value) || is_object($value)) {
+            return $this->_toJson($value);
         }
 
         return (string)$value;
+    }
+
+    private function _toJson(mixed $value): string
+    {
+        $json = json_encode(
+            $value,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR,
+        );
+
+        return $json === false ? '' : $json;
     }
 
     /**

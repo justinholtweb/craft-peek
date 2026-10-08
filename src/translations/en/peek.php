@@ -118,4 +118,5 @@ return [
     'The release wasn’t published.' => 'The release wasn’t published.',
     'There are no other drafts you can add. A draft can be added by anyone who could publish it.' => 'There are no other drafts you can add. A draft can be added by anyone who could publish it.',
     '{user} isn’t allowed to publish “{title}”.' => '{user} isn’t allowed to publish “{title}”.',
+    'This field can’t be compared.' => 'This field can’t be compared.',
 ];
