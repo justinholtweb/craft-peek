@@ -138,6 +138,11 @@ Peek is a content staging and visual diff plugin for Craft CMS 5. Single paid ed
 - Marks release as "publishing" to prevent re-pickup
 - Designed for cron: `* * * * * /path/to/craft peek/scheduler/check`
 
+**ReleasesController (console)** — `peek/releases/list|status|publish` for deploy pipelines (added 2026-10-09):
+- `list` (`--status`, `--site`, `--json`), `status <id>` (exit 1 when Failed or `validateRelease()` finds problems), `publish <id>` (`--as`, `--dry-run`/`-n`, `--json`)
+- `publish` runs as the system (`publishRelease($release, null)`, trusted) unless `--as` names an active user with `peek:publishReleases`; then it's `publishRelease($release, $user)`, which re-checks every draft. Refuses Published and Publishing (the queue owns it)
+- Tested for real in `tests/harness/console.php` (shells out to `php craft`)
+
 ---
 
 ## Phase 6: Entry Editor Integration & Events — COMPLETE
@@ -240,6 +245,7 @@ src/
 │   ├── DiffController.php
 │   └── SettingsController.php
 ├── console/controllers/
+│   ├── ReleasesController.php
 │   └── SchedulerController.php
 ├── queue/jobs/
 │   └── PublishReleaseJob.php
@@ -301,8 +307,11 @@ src/
 ```sh
 # Codeception (unit + integration) from the PHP 8.4 runner, against a throwaway DB on the harness MySQL
 docker exec ddev-plugin-testing-db mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS craft_peek_test"
-docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 152 tests
+docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 155 tests
 
 # Controllers and screens over HTTP, in the plugin-testing harness
 docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/security.php   # 17 checks
+
+# Console commands, run for real (`php craft peek/releases/*` as child processes), in the harness
+docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/console.php    # 15 checks
 ```

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Console commands for deploy pipelines: `peek/releases/list`, `peek/releases/status <id>` and `peek/releases/publish <id>`, each with `--json`. `status` exits non-zero for a release that failed or can't be published as it stands; `publish` takes `--dry-run`, and `--as=<user>` to publish with one user's permissions. Without `--as`, a console publish runs as the system and doesn't check permissions — see the README
+- `tests/harness/console.php` (15 checks) runs the commands for real in the harness
+
 ## 5.0.5 - 2026-10-08
 
 ### Fixed

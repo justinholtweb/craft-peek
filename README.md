@@ -31,6 +31,32 @@ To enable scheduled releases, add a cron job that runs every minute:
 * * * * * /path/to/craft peek/scheduler/check
 ```
 
+## Console commands
+
+For deploy pipelines and scripts, releases can be listed, checked and published from the command line:
+
+```bash
+php craft peek/releases/list                     # every release, newest first
+php craft peek/releases/list --status=ready --site=default --json
+php craft peek/releases/status 12                # one release, its entries, and anything that would stop it
+php craft peek/releases/publish 12 --dry-run     # check it could be published, apply nothing
+php craft peek/releases/publish 12 --interactive=0
+php craft peek/releases/publish 12 --as=jane@example.com
+```
+
+- Every command takes `--json` for machine-readable output.
+- `status` exits `0` for a release that's fine and `1` for one that failed or can't be published as it
+  stands (no entries, a draft that's gone). A missing release exits `65`.
+- `publish` applies every draft in the release or none of them, exactly like the control panel's
+  Publish button, and exits `1` if nothing was published. It won't publish a release that's already
+  published, or one the scheduler has handed to the queue. Without `--interactive=0` it asks first.
+
+> **The console runs as the system.** There's no signed-in user, so `publish` applies the release's
+> drafts without checking anyone's permissions — whoever can run `php craft` can already change
+> anything on the site. Pass `--as=<username or email>` to hold the publish to one user's rights
+> instead: they need the Publish releases permission, and every draft must be one they could apply
+> in Craft's editor, or nothing is published. The user is recorded as the publisher.
+
 ## Permissions
 
 | Permission | Description |
