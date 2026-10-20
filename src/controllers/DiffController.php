@@ -29,7 +29,10 @@ class DiffController extends Controller
 
         $diffService = Plugin::getInstance()->diff;
         $diffs = $diffService->diffEntry($draft, $canonical);
-        $previewUrls = $diffService->getPreviewUrls($draft, $canonical);
+        // Each draft URL is a new preview token, so don't make them for a tab that isn't shown
+        $previewUrls = Plugin::getInstance()->getSettings()->enableVisualPreview
+            ? $diffService->getPreviewUrls($draft, $canonical)
+            : ['canonical' => null, 'draft' => null];
 
         $changedCount = count(array_filter($diffs, fn($d) => $d->hasChanges));
 
@@ -44,6 +47,10 @@ class DiffController extends Controller
 
     public function actionPreview(int $draftId): Response
     {
+        if (!Plugin::getInstance()->getSettings()->enableVisualPreview) {
+            throw new NotFoundHttpException('Visual preview is turned off.');
+        }
+
         [$draft, $canonical] = $this->viewableDraft($draftId);
 
         $previewUrls = Plugin::getInstance()->diff->getPreviewUrls($draft, $canonical);

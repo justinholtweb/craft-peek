@@ -15,6 +15,8 @@ use craft\fields\Entries as EntriesField;
 use craft\fields\Lightswitch as LightswitchField;
 use craft\fields\Link as LinkField;
 use craft\fields\Users as UsersField;
+use craft\helpers\StringHelper;
+use craft\helpers\UrlHelper;
 use Jfcherng\Diff\DiffHelper;
 use justinholtweb\peek\models\FieldDiff;
 use yii\base\Arrayable;
@@ -95,8 +97,44 @@ class DiffService extends Component
     {
         return [
             'canonical' => $canonical->getUrl(),
-            'draft' => $draft->getUrl(),
+            'draft' => $this->_draftPreviewUrl($draft),
         ];
+    }
+
+    /**
+     * A draft has its entry's URI, so its plain URL serves the live page. Before 5.1.1 that's
+     * what the Draft pane showed. This is the URL Craft's own Preview button builds: a preview
+     * token that swaps the draft in for its entry, and the signed `x-craft-preview` param that
+     * makes `craft.app.request.isPreview` true (and keeps static caches out of the way).
+     */
+    private function _draftPreviewUrl(Entry $draft): ?string
+    {
+        $url = $draft->getUrl();
+        if ($url === null) {
+            return null;
+        }
+
+        $token = Craft::$app->getTokens()->createPreviewToken([
+            'preview/preview', [
+                'elementType' => Entry::class,
+                'canonicalId' => $draft->getCanonicalId(),
+                'siteId' => $draft->siteId,
+                'draftId' => $draft->draftId,
+                'revisionId' => null,
+                'userId' => Craft::$app->getUser()->getId(),
+            ],
+        ]);
+
+        if ($token === false) {
+            Craft::warning("Couldn't create a preview token for draft {$draft->id}.", 'peek');
+            return null;
+        }
+
+        $url = UrlHelper::urlWithParams($url, [
+            'x-craft-preview' => Craft::$app->getSecurity()->hashData(StringHelper::randomString(10)),
+        ]);
+
+        return UrlHelper::urlWithToken($url, $token);
     }
 
     private function _diffField(FieldInterface $field, Entry $draft, Entry $canonical): FieldDiff

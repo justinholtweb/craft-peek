@@ -300,6 +300,7 @@ src/
 - **Craft 5.11 added a static `Controller::currentUser()`.** A private instance method of that name is a fatal on load ("Cannot make static method … non static"); Peek's own vendor Craft (5.10) doesn't have it, so only the harness caught it.
 - **`getSection()` throws on a draft whose section is gone.** List code filters those out.
 - **`Model::validate()` clears errors**, so `saveRelease()` after `addErrors()` loses them — add errors after saving.
+- **A draft's `getUrl()` is the live page.** It shares its entry's URI; only a preview token (`Tokens::createPreviewToken(['preview/preview', [... 'draftId' => …]])`) renders the draft. Visual Preview's Draft pane used the plain URL until 5.1.1 (issue #2)
 - **Third-party field values can be any object.** SEOmatic returns a `MetaBundle` model with no `__toString()` (issue #1). `_fieldValueToString()` must never cast an unknown object to string; models go through `toArray()`, the rest through JSON, and `diffEntry()` catches per field.
 
 ## Testing
@@ -307,10 +308,10 @@ src/
 ```sh
 # Codeception (unit + integration) from the PHP 8.4 runner, against a throwaway DB on the harness MySQL
 docker exec ddev-plugin-testing-db mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS craft_peek_test"
-docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 155 tests
+docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 156 tests
 
 # Controllers and screens over HTTP, in the plugin-testing harness
-docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/security.php   # 17 checks
+docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/security.php   # 19 checks
 
 # Console commands, run for real (`php craft peek/releases/*` as child processes), in the harness
 docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/console.php    # 15 checks

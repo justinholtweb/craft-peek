@@ -2,6 +2,7 @@
 
 namespace justinholtweb\peek\tests\integration;
 
+use Craft;
 use justinholtweb\peek\models\FieldDiff;
 use justinholtweb\peek\tests\Support\PeekTestCase;
 
@@ -154,5 +155,35 @@ class DiffEntryTest extends PeekTestCase
         $this->assertArrayHasKey('draft', $urls);
         $this->assertNull($urls['canonical']);
         $this->assertNull($urls['draft']);
+    }
+
+    /**
+     * A draft shares its entry's URI, so its plain URL is the live page — what the Draft pane
+     * showed before 5.1.1 (#2). The pane needs a preview token that swaps the draft in.
+     */
+    public function testTheDraftPreviewUrlCarriesATokenForTheDraft(): void
+    {
+        $canonical = $this->createEntry('Has a URL');
+        $draft = $this->createDraft($canonical, ['title' => 'Has a URL draft']);
+        // The test section has no URLs; a URI is all getUrl() needs
+        $canonical->uri = $draft->uri = 'news/has-a-url';
+
+        $urls = $this->diff()->getPreviewUrls($draft, $canonical);
+
+        $this->assertSame($canonical->getUrl(), $urls['canonical']);
+        $this->assertNotNull($urls['draft']);
+        $this->assertStringStartsWith($draft->getUrl() . '?', $urls['draft']);
+
+        parse_str((string)parse_url($urls['draft'], PHP_URL_QUERY), $params);
+        $tokenParam = Craft::$app->getConfig()->getGeneral()->tokenParam;
+        $this->assertArrayHasKey($tokenParam, $params);
+        $this->assertNotFalse(Craft::$app->getSecurity()->validateData($params['x-craft-preview'] ?? ''), 'x-craft-preview isn’t signed, so request.isPreview would be false.');
+
+        $route = Craft::$app->getTokens()->getTokenRoute($params[$tokenParam]);
+        $this->assertIsArray($route);
+        $this->assertSame('preview/preview', $route[0]);
+        $this->assertSame($draft->draftId, $route[1]['draftId']);
+        $this->assertSame($canonical->id, $route[1]['canonicalId']);
+        $this->assertSame($draft->siteId, $route[1]['siteId']);
     }
 }

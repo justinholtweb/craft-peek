@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.1 - 2026-10-20
+
+### Fixed
+- Visual Preview’s Draft pane showed the live page, so both panes always matched ([#2](https://github.com/justinholtweb/craft-peek/issues/2)). A draft has its entry’s URI, and the pane loaded that URL with no preview token; it now loads the draft through a Craft preview token, the way Craft’s own Preview button does, so `craft.app.request.isPreview` is true there too
+- Turning off the Enable Visual Preview setting did nothing. It now hides the Visual Preview tab and the preview screen
+
 ## 5.1.0 - 2026-10-09
 ### Added
 - Console commands for deploy pipelines: `peek/releases/list`, `peek/releases/status <id>` and `peek/releases/publish <id>`, each with `--json`. `status` exits non-zero for a release that failed or can't be published as it stands; `publish` takes `--dry-run`, and `--as=<user>` to publish with one user's permissions. Without `--as`, a console publish runs as the system and doesn't check permissions — see the README

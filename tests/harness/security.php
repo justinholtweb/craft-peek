@@ -81,7 +81,11 @@ $entry = new Entry([
     'typeId' => $section->getEntryTypes()[0]->id,
     'authorId' => $admin->id,
     'title' => "Peek live $run",
+    // Saved without validation, which is where Craft makes the slug and URI — and the preview needs a URL
+    'slug' => "peek-live-$run",
+    'postDate' => new DateTime(),
 ]);
+Craft::$app->getElements()->setElementUri($entry);
 Craft::$app->getElements()->saveElement($entry, false);
 $cleanup['elements'][] = $entry;
 
@@ -167,6 +171,53 @@ check('…and shown to someone who can', function() use ($adminHttp, $secret) {
     $response = $adminHttp->get("index.php?p=admin/peek/diff/{$secret->id}");
 
     return $response->getStatusCode() === 200 && str_contains((string)$response->getBody(), 'Peek secret draft') ?: 'status ' . $response->getStatusCode();
+});
+
+// The iframe srcs the diff screen renders, fetched the way the browser would: signed in (this site's front end isn't public)
+$previewFrames = function() use ($adminHttp, $secret): array {
+    $html = (string)$adminHttp->get("index.php?p=admin/peek/diff/{$secret->id}")->getBody();
+    $frames = [];
+    foreach (['canonical', 'draft'] as $pane) {
+        if (preg_match('/<iframe src="([^"]+)"[^>]*id="peek-iframe-' . $pane . '"/', $html, $m)) {
+            $url = parse_url(html_entity_decode($m[1]));
+            $frames[$pane] = (string)$adminHttp->get(ltrim($url['path'] ?? '', '/') . (isset($url['query']) ? '?' . $url['query'] : ''))->getBody();
+        }
+    }
+
+    return $frames;
+};
+
+// Before 5.1.1 the Draft pane was the draft's plain URL — the live page, so both panes matched (#2)
+check('the Draft pane renders the draft, the Live pane the entry', function() use ($previewFrames, $run) {
+    $frames = $previewFrames();
+    if (count($frames) !== 2) {
+        return 'panes found: ' . implode(', ', array_keys($frames));
+    }
+
+    $live = str_contains($frames['canonical'], "Peek live $run") && !str_contains($frames['canonical'], "Peek secret draft $run");
+    $draft = str_contains($frames['draft'], "Peek secret draft $run") && !str_contains($frames['draft'], "Peek live $run");
+
+    return $live && $draft ?: 'live pane ' . ($live ? 'ok' : 'wrong') . ', draft pane ' . ($draft ? 'ok' : 'wrong');
+});
+
+check('with Visual Preview off, there’s no preview tab or screen', function() use ($peek, $adminHttp, $previewFrames, $secret) {
+    // Saved in full (it stores only the keys it's given) and flushed now, not at the end of this script,
+    // so the web requests see it
+    $original = $peek->getSettings()->toArray();
+    $save = function(array $settings) use ($peek): void {
+        Craft::$app->getPlugins()->savePluginSettings($peek, $settings);
+        Craft::$app->getProjectConfig()->flush();
+    };
+    $save(['enableVisualPreview' => false] + $original);
+
+    try {
+        $frames = $previewFrames();
+        $preview = $adminHttp->get("index.php?p=admin/peek/diff/{$secret->id}/preview")->getStatusCode();
+    } finally {
+        $save($original);
+    }
+
+    return $frames === [] && $preview === 404 ?: count($frames) . " panes, preview $preview";
 });
 
 check('the dashboard doesn’t list the draft to the editor', function() use ($editorHttp, $run) {
