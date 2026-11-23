@@ -79,7 +79,7 @@ tests/  Pest on PluginTestCase (real Craft 6 + Peek on in-memory SQLite)
 
 ```sh
 # In the Craft 6 harness container (PHP 8.5), from the worktree:
-docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pest      # 62 tests
+docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pest      # 65 tests
 docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pint --test
 docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/phpstan analyse --memory-limit=1G   # level 6
 ~/Sites/plugin-testing-craft6/bin/port-check craft-peek

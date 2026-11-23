@@ -79,6 +79,15 @@ class DraftReleasesController
             throw ValidationException::withMessages(['release' => t('Choose a release.', category: 'peek')]);
         }
 
+        // Only a release this screen would have offered: that carries the release-management
+        // permission and every other gate, so a hand-made POST can't get past them.
+        $offered = array_filter(
+            $this->releases->addableFor($draft, $user),
+            fn (ReleaseSummary $release) => $release->source === $source && $release->id === (int) $id,
+        );
+
+        abort_if($offered === [], 403, 'You can’t add this draft to that release.');
+
         if (($error = $this->releases->addDraft($source, (int) $id, $draft, $user)) !== null) {
             throw ValidationException::withMessages(['release' => $error]);
         }

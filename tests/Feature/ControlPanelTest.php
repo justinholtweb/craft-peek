@@ -181,3 +181,13 @@ it('adds Peek’s rows to a draft’s editor metadata', function () {
         ->and($metadata['Fields changed']())->toBe('1')
         ->and($metadata['Diff']())->toContain("peek/diff/{$draft->id}");
 });
+
+it('won’t add a draft to a release for someone who can’t manage releases, even by posting directly', function () {
+    $draft = $this->createDraft($this->createEntry('Direct'), ['title' => 'Direct draft']);
+    $release = Release::query()->create(['name' => 'Not yours to fill', 'siteId' => Sites::getPrimarySite()->id]);
+    $author = $this->userWith(array_values(array_diff(EDITOR, ['peek:manageReleases', 'peek:publishReleases'])));
+
+    $this->actingAs($author)->post(cp_url("peek/drafts/{$draft->id}/releases"), ['release' => "peek:{$release->id}"])->assertForbidden();
+
+    expect($release->entries()->count())->toBe(0);
+});

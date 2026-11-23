@@ -177,7 +177,8 @@ class Releases
             if ($draft !== null && ! $this->canApply($draft, $user)) {
                 $errors[] = t('{user} isn’t allowed to publish “{title}”.', [
                     'user' => $user->asElement()->getName(),
-                    'title' => $draft->title ?? "#{$draft->id}",
+                    // Only a title they could read anyway.
+                    'title' => $user->can('view', $draft) ? ($draft->title ?? "#{$draft->id}") : "#{$draft->id}",
                 ], category: 'peek');
             }
         }

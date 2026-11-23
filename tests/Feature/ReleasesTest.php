@@ -152,3 +152,13 @@ it('lists the unpublished releases a draft is in', function () {
 
     expect(app(Releases::class)->forDraft($draft->id)->pluck('name')->all())->toBe(['Open']);
 });
+
+it('doesn’t name a draft the publisher can’t view', function () {
+    $release = newRelease();
+    app(Releases::class)->addDraft($release, $this->createDraft($this->createEntry('Classified'), ['title' => 'Classified plan']), null);
+    $publisher = $this->userWith(['peek:accessPlugin', 'peek:manageReleases', 'peek:publishReleases']);
+
+    $problems = app(Releases::class)->publish($release, $publisher);
+
+    expect(implode(' ', $problems))->toContain('isn’t allowed to publish')->not->toContain('Classified');
+});
