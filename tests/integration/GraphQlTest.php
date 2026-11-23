@@ -6,7 +6,9 @@ use Craft;
 use craft\elements\Entry;
 use craft\fieldlayoutelements\CustomField;
 use craft\fields\Entries as EntriesField;
+use craft\fields\Link as LinkField;
 use craft\fields\Matrix;
+use craft\fields\PlainText;
 use craft\gql\GqlEntityRegistry;
 use craft\models\EntryType;
 use craft\models\FieldLayout;
@@ -320,5 +322,54 @@ GQL);
 
         $this->assertSame('1 related element', $fields['related']['oldValue']);
         $this->assertSame('(none)', $fields['related']['newValue']);
+    }
+
+    public function testAnElementLinkIsCountedAndAUrlLinkIsShown(): void
+    {
+        $this->ensureSection();
+        $link = new LinkField(['name' => 'Link', 'handle' => 'promoLink', 'types' => ['entry', 'url']]);
+        $this->assertTrue(Craft::$app->getFields()->saveField($link), json_encode($link->getErrors()));
+        $layout = $this->entryType->getFieldLayout();
+        $tab = $layout->getTabs()[0];
+        $tab->setElements([...$tab->getElements(), new CustomField($link)]);
+        $layout->setTabs([$tab]);
+        $this->entryType->setFieldLayout($layout);
+        $this->assertTrue(Craft::$app->getEntries()->saveEntryType($this->entryType));
+
+        $target = $this->createEntry('Secret link target');
+        $canonical = $this->createEntry('Linking', ['promoLink' => ['type' => 'url', 'value' => 'https://example.com/public']]);
+        $draft = $this->createDraft($canonical, [], ['promoLink' => ['type' => 'entry', 'value' => $target->id]]);
+        $this->assertNotNull(Entry::find()->id($draft->id)->drafts(true)->status(null)->one()->getFieldValue('promoLink')?->getElement(), 'The draft should hold an element link, or this test proves nothing.');
+        $this->schema($this->fullScope());
+
+        $fields = array_column(PeekResolver::draftDiff(null, ['draftId' => $draft->id])['fields'], null, 'handle');
+
+        $this->assertTrue($fields['promoLink']['changed']);
+        $this->assertSame('https://example.com/public', $fields['promoLink']['oldValue']);
+        $this->assertSame('1 linked element', $fields['promoLink']['newValue']);
+        $this->assertStringNotContainsString('Secret', json_encode($fields));
+        $this->assertStringNotContainsString((string)$target->id, (string)$fields['promoLink']['newValue']);
+    }
+
+    public function testAnyValueHoldingElementsIsCountedWhenRedacting(): void
+    {
+        $first = $this->createEntry('Secret one');
+        $second = $this->createEntry('Secret two');
+        $field = new PlainText(['name' => 'Anything', 'handle' => 'anything']);
+        $serialize = new \ReflectionMethod($this->diff(), '_fieldValueToString');
+
+        $redacted = fn(mixed $value) => $serialize->invoke($this->diff(), $field, $value, null, 0, true);
+
+        // The JSON fallback would otherwise print the elements' attributes.
+        $this->assertSame('2 related elements', $redacted(['items' => [$first, ['nested' => $second]]]));
+        $this->assertSame('1 related element', $redacted($first));
+        $this->assertSame('2 related elements', $redacted(collect([$first, $second])));
+        $this->assertSame('1 related element', $redacted((object)['target' => $first]));
+        $this->assertSame('(none)', $redacted(Entry::find()->id(0)));
+        // Values without elements are shown as before.
+        $this->assertSame('plain', $redacted('plain'));
+        $this->assertStringContainsString('"a": 1', $redacted(['a' => 1]));
+
+        $this->assertStringContainsString('Secret one', $serialize->invoke($this->diff(), $field, [$first], null, 0, false), 'Unredacted (CP, MCP) is unchanged.');
     }
 }

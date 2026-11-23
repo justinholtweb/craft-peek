@@ -11,6 +11,7 @@ use craft\fields\Assets as AssetsField;
 use craft\fields\BaseRelationField;
 use craft\fields\Categories as CategoriesField;
 use craft\fields\Color as ColorField;
+use craft\fields\data\LinkData;
 use craft\fields\Date as DateField;
 use craft\fields\Email as EmailField;
 use craft\fields\Entries as EntriesField;
@@ -212,9 +213,24 @@ class DiffService extends Component
             return $this->_nestedEntriesToString($field, $value, $owner, $depth, $redact);
         }
 
-        // Redacted: any relation field, core or third-party, is only a count
-        if ($redact && $field instanceof BaseRelationField) {
-            return $this->_relationCount($value);
+        // Redacted (GraphQL), deny by default: nothing that holds an element is shown, only counted.
+        // A schema's scopes cover the draft, not what its fields point at.
+        if ($redact) {
+            if ($field instanceof BaseRelationField) {
+                return $this->_relationCount($value);
+            }
+
+            // An element link's text is the element's URL
+            if ($value instanceof LinkData) {
+                return $value->getElement() !== null
+                    ? Craft::t('peek', '1 linked element')
+                    : (string)$value;
+            }
+
+            $elements = $this->_countElements($value);
+            if ($elements !== null) {
+                return $elements === 0 ? '(none)' : $this->_relatedText($elements);
+            }
         }
 
         if ($value === null) {
@@ -409,7 +425,52 @@ class DiffService extends Component
             return '(none)';
         }
 
+        return $this->_relatedText($count);
+    }
+
+    private function _relatedText(int $count): string
+    {
         return Craft::t('peek', '{n, plural, =1{# related element} other{# related elements}}', ['n' => $count]);
+    }
+
+    /**
+     * How many elements a value holds, or null when it holds none and isn't an element container.
+     * Looks inside arrays, collections and plain objects, `$maxDepth` levels down; anything past
+     * that counts as holding an element, so redaction fails closed.
+     */
+    private function _countElements(mixed $value, int $depth = 0, int $maxDepth = 5): ?int
+    {
+        if ($value instanceof ElementInterface) {
+            return 1;
+        }
+
+        if ($value instanceof \craft\elements\db\ElementQueryInterface) {
+            return (int)(clone $value)->count();
+        }
+
+        if ($value instanceof Collection) {
+            $value = $value->all();
+        } elseif ($value instanceof Arrayable || $value instanceof \JsonSerializable || (is_object($value) && !$value instanceof \Stringable)) {
+            $value = get_object_vars($value);
+        }
+
+        if (!is_array($value)) {
+            return null;
+        }
+
+        if ($depth >= $maxDepth) {
+            return $value === [] ? null : 1;
+        }
+
+        $count = null;
+        foreach ($value as $item) {
+            $found = $this->_countElements($item, $depth + 1, $maxDepth);
+            if ($found !== null) {
+                $count = ($count ?? 0) + $found;
+            }
+        }
+
+        return $count;
     }
 
     /**
