@@ -118,7 +118,7 @@ On Pro and Enterprise, Craft schedules its own releases.
 
 - **Compare in Craft.** The diff screen links to Craft 6's own Compare screen for the same draft,
   which shows each field's preview.
-- **Content Block fields** (new in Craft 6) are compared by content, like Matrix.
+- **Content Block fields** are compared by content, like Matrix (Peek 5 compared them as JSON).
 - **Categories and Tags** fields are gone from Craft 6 (they became entries in Craft 5's
   `entrify` commands), so there's nothing Category-specific left in the diff.
 
