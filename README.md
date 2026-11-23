@@ -185,7 +185,9 @@ Drafts are unpublished content, so:
   (and its `entryCount`) are filtered the same way. On Pro and Enterprise, Craft's releases also need
   the schema's release option.
 - Related elements in a diff (relation fields, also inside Matrix) are shown only as a count, such
-  as `1 related element`: they may be outside the schema's scopes. `changed` still reflects them.
+  as `1 related element`: they may be outside the schema's scopes. Links to an element show as
+  `1 linked element`, and third-party field values Peek can't see into as `(not shown over
+  GraphQL)`. `changed` still reflects all of them.
 - It's read-only: there are no mutations.
 
 ## Notifications and the publish webhook

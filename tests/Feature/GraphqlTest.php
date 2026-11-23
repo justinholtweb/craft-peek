@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use CraftCms\Cms\Field\PlainText;
 use CraftCms\Cms\Gql\Data\GqlSchema;
 use CraftCms\Cms\Gql\Gql;
 use CraftCms\Cms\Support\Facades\Sites;
+use Illuminate\Contracts\Support\Arrayable;
 use JustinHoltWeb\Peek\Models\Release;
 use JustinHoltWeb\Peek\Services\Diff;
 use JustinHoltWeb\Peek\Services\Releases;
@@ -122,4 +124,33 @@ it('shows related elements in a diff only as a count', function () {
     // The CP still names them.
     $cp = collect(app(Diff::class)->diffEntry($draft, $canonical))->keyBy('handle');
     expect($cp['related']->newValue)->toContain('Top secret target');
+});
+
+it('redacts anything holding elements, and objects it can’t see into', function () {
+    $diff = app(Diff::class);
+    $field = new PlainText(['handle' => 'x', 'name' => 'X']);
+    $secret = $this->createEntry('Hidden thing');
+    $redact = function (mixed $value) use ($diff, $field): string {
+        $set = fn (string $prop, bool $on) => (fn () => $this->$prop = $on)->call($diff);
+        $set('redactRelations', true);
+        $set('displaying', true);
+
+        try {
+            return $diff->valueToString($field, $value);
+        } finally {
+            $set('redactRelations', false);
+            $set('displaying', false);
+        }
+    };
+
+    expect($redact([['nested' => [$secret]]]))->toBe('1 related element')
+        ->and($redact(new class implements Arrayable
+        {
+            public function toArray(): array
+            {
+                return ['title' => 'Hidden thing'];
+            }
+        }))->toBe('(not shown over GraphQL)')
+        ->and($redact([['col1' => 'plain']]))->toContain('plain')
+        ->and($redact('just text'))->toBe('just text');
 });

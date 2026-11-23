@@ -13,6 +13,7 @@ use CraftCms\Cms\Field\Color as ColorField;
 use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
 use CraftCms\Cms\Field\Contracts\FieldInterface;
 use CraftCms\Cms\Field\Contracts\RelationalFieldInterface;
+use CraftCms\Cms\Field\Data\LinkData;
 use CraftCms\Cms\Field\Date as DateField;
 use CraftCms\Cms\Field\Email as EmailField;
 use CraftCms\Cms\Field\Lightswitch as LightswitchField;
@@ -266,6 +267,20 @@ class Diff
             $value = $value->all();
         }
 
+        // Over GraphQL, deny by default: anything that is, holds or links to an element is shown
+        // only as a count, and an object we can't see into isn't shown at all.
+        if ($this->redactRelations && $this->displaying) {
+            if ($value instanceof LinkData) {
+                if ($value->getElement() !== null) {
+                    return '1 linked element';
+                }
+            } elseif (($elements = self::countElements($value)) > 0) {
+                return $elements === 1 ? '1 related element' : $elements.' related elements';
+            } elseif (is_object($value) && ! $value instanceof DateTimeInterface && ! $value instanceof Stringable && ! $value instanceof ElementQueryInterface) {
+                return '(not shown over GraphQL)';
+            }
+        }
+
         if ($field instanceof LightswitchField) {
             return ! empty($value) ? 'On' : 'Off';
         }
@@ -451,6 +466,31 @@ class Diff
         }
 
         return array_values(array_filter($elements, fn ($el) => $el instanceof ElementInterface));
+    }
+
+    /**
+     * How many elements a value is or holds, looking into arrays up to a few levels deep.
+     */
+    private static function countElements(mixed $value, int $depth = 0): int
+    {
+        if ($value instanceof ElementInterface) {
+            return 1;
+        }
+
+        if ($value instanceof ElementQueryInterface) {
+            return (int) (clone $value)->count();
+        }
+
+        if (! is_array($value) || $depth >= 5) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($value as $item) {
+            $count += self::countElements($item instanceof Collection ? $item->all() : $item, $depth + 1);
+        }
+
+        return $count;
     }
 
     private function scalarString(mixed $value): string
