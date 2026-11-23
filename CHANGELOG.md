@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.1.2 - 2026-11-23
+
+### Security
+- On multi-site installs, the diff and preview screens showed a draft in a site the viewer had no access to. They now need the same Edit site permission as Craft's entry editor
+
+### Fixed
+- Matrix fields were compared by block ID, so the diff showed only lines like `(#457038)`, and a block the draft had touched counted as changed even when its content matched the entry's ([#3](https://github.com/justinholtweb/craft-peek/issues/3)). A draft gets its own copy of every block it edits, with a new ID. Blocks are now compared by content: each one is listed by number and entry type, with its title and field values, nested Matrix included
+- The draft sidebar's Fields Changed count could differ from the diff screen's ([#3](https://github.com/justinholtweb/craft-peek/issues/3)). The sidebar counted the entry editor's copy of the draft, whose field values can be pre-loaded in a form the diff read differently; it now counts the saved draft, as the diff screen does, and its View Diff link opens the diff in the same site
+
 ## 5.1.1 - 2026-10-20
 
 ### Fixed

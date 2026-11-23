@@ -3,6 +3,7 @@
 namespace justinholtweb\peek\services;
 
 use Craft;
+use craft\base\ElementInterface;
 use craft\base\FieldInterface;
 use craft\elements\Asset;
 use craft\elements\Entry;
@@ -14,9 +15,11 @@ use craft\fields\Email as EmailField;
 use craft\fields\Entries as EntriesField;
 use craft\fields\Lightswitch as LightswitchField;
 use craft\fields\Link as LinkField;
+use craft\fields\Matrix as MatrixField;
 use craft\fields\Users as UsersField;
 use craft\helpers\StringHelper;
 use craft\helpers\UrlHelper;
+use Illuminate\Support\Collection;
 use Jfcherng\Diff\DiffHelper;
 use justinholtweb\peek\models\FieldDiff;
 use yii\base\Arrayable;
@@ -144,8 +147,8 @@ class DiffService extends Component
         $newValue = $draft->getFieldValue($handle);
 
         // Use field-type-aware serialization
-        $oldStr = $this->_fieldValueToString($field, $oldValue);
-        $newStr = $this->_fieldValueToString($field, $newValue);
+        $oldStr = $this->_fieldValueToString($field, $oldValue, $canonical);
+        $newStr = $this->_fieldValueToString($field, $newValue, $draft);
 
         $diff = new FieldDiff();
         $diff->handle = $handle;
@@ -187,10 +190,22 @@ class DiffService extends Component
      * Serialize a field value to a comparable string representation.
      * Each field type gets appropriate treatment.
      */
-    private function _fieldValueToString(FieldInterface $field, mixed $value): string
+    private function _fieldValueToString(FieldInterface $field, mixed $value, ?ElementInterface $owner = null, int $depth = 0): string
     {
+        // Matrix — compare blocks by what's in them. A draft gets its own copy of every block it
+        // touches, with a new ID, so before 5.1.2 an edited-then-reverted block read as a change
+        // and the diff showed nothing but "(#id)" lines (issue #3).
+        if ($field instanceof MatrixField) {
+            return $this->_nestedEntriesToString($field, $value, $owner, $depth);
+        }
+
         if ($value === null) {
             return '';
+        }
+
+        // Eager-loaded relations (e.g. the element open in the entry editor) come as a collection
+        if ($value instanceof Collection) {
+            $value = $value->all();
         }
 
         // Lightswitch — boolean
@@ -280,6 +295,73 @@ class DiffService extends Component
         return (string)$value;
     }
 
+    /**
+     * A Matrix field's blocks, each as its entry type, title and field values, indented under
+     * a "#n Type" heading. The blocks are always queried fresh from the owner, enabled or not,
+     * so the entry open in the editor (whose field value may be a preloaded set) and the diff
+     * page read the same thing.
+     */
+    private function _nestedEntriesToString(MatrixField $field, mixed $value, ?ElementInterface $owner, int $depth): string
+    {
+        if ($owner !== null && $owner->id) {
+            $entries = $field->normalizeValue(null, $owner)->status(null)->all();
+        } elseif ($value instanceof \craft\elements\db\ElementQueryInterface) {
+            $entries = (clone $value)->status(null)->all();
+        } elseif ($value instanceof Collection) {
+            $entries = $value->all();
+        } elseif (is_array($value)) {
+            $entries = $value;
+        } else {
+            return '';
+        }
+
+        if (empty($entries)) {
+            return '(none)';
+        }
+
+        // Matrix inside Matrix inside… — past this, fall back to IDs
+        if ($depth >= 4) {
+            return $this->_relationsToString($entries);
+        }
+
+        $blocks = [];
+        foreach (array_values($entries) as $i => $entry) {
+            if (!$entry instanceof Entry) {
+                continue;
+            }
+
+            $type = $entry->getType();
+            $lines = ['#' . ($i + 1) . ' ' . $type->name . ($entry->enabled ? '' : ' (disabled)')];
+
+            if ($type->hasTitleField && (string)$entry->title !== '') {
+                $lines[] = '    Title: ' . $entry->title;
+            }
+
+            foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $nestedField) {
+                try {
+                    $str = $this->_fieldValueToString($nestedField, $entry->getFieldValue($nestedField->handle), $entry, $depth + 1);
+                } catch (\Throwable $e) {
+                    Craft::warning("Couldn't diff nested field \"{$nestedField->handle}\": {$e->getMessage()}", __METHOD__);
+                    $str = '?';
+                }
+
+                if (trim($str) === '' || $str === '(none)') {
+                    continue;
+                }
+
+                $valueLines = explode("\n", str_replace(["\r\n", "\r"], "\n", trim($str)));
+                $lines[] = '    ' . $nestedField->name . ': ' . array_shift($valueLines);
+                foreach ($valueLines as $line) {
+                    $lines[] = '        ' . $line;
+                }
+            }
+
+            $blocks[] = implode("\n", $lines);
+        }
+
+        return implode("\n\n", $blocks);
+    }
+
     private function _toJson(mixed $value): string
     {
         $json = json_encode(
@@ -296,6 +378,8 @@ class DiffService extends Component
     private function _relationsToString(mixed $value): string
     {
         if ($value instanceof \craft\elements\db\ElementQueryInterface) {
+            $elements = $value->all();
+        } elseif ($value instanceof Collection) {
             $elements = $value->all();
         } elseif (is_array($value)) {
             $elements = $value;
@@ -321,6 +405,8 @@ class DiffService extends Component
     private function _assetsToString(mixed $value): string
     {
         if ($value instanceof \craft\elements\db\ElementQueryInterface) {
+            $elements = $value->all();
+        } elseif ($value instanceof Collection) {
             $elements = $value->all();
         } elseif (is_array($value)) {
             $elements = $value;

@@ -212,15 +212,28 @@ class Plugin extends BasePlugin
         $meta = [];
 
         if ($user->can('peek:viewDiffs')) {
+            // Count the saved draft, the way the diff page loads it. The editor's own element can
+            // hold field values the diff page never sees (eager-loaded relations, preloaded
+            // Matrix blocks), and before 5.1.2 the two counts disagreed (issue #3).
+            $saved = Entry::find()
+                ->id($draft->id)
+                ->siteId($draft->siteId)
+                ->drafts(true)
+                ->provisionalDrafts(false)
+                ->status(null)
+                ->one() ?? $draft;
+            /** @var Entry $savedCanonical */
+            $savedCanonical = $saved === $draft ? $canonical : $saved->getCanonical();
+
             $changedCount = 0;
-            foreach ($this->diff->diffEntry($draft, $canonical) as $diff) {
+            foreach ($this->diff->diffEntry($saved, $savedCanonical) as $diff) {
                 if ($diff->hasChanges) {
                     $changedCount++;
                 }
             }
 
             $meta[Craft::t('peek', 'Fields Changed')] = (string)$changedCount;
-            $meta[Craft::t('peek', 'Diff')] = Html::a(Craft::t('peek', 'View Diff'), UrlHelper::cpUrl("peek/diff/{$draft->id}"), ['class' => 'go']);
+            $meta[Craft::t('peek', 'Diff')] = Html::a(Craft::t('peek', 'View Diff'), UrlHelper::cpUrl("peek/diff/{$draft->id}", ['siteId' => $draft->siteId]), ['class' => 'go']);
         }
 
         if ($user->can('peek:manageReleases')) {

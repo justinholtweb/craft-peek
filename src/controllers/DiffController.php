@@ -72,8 +72,15 @@ class DiffController extends Controller
      */
     private function viewableDraft(int $draftId): array
     {
+        // The site the draft was opened in, so the sidebar's count and this page agree
+        $siteId = $this->request->getQueryParam('siteId');
+        if ($siteId !== null && !Craft::$app->getSites()->getSiteById((int)$siteId)) {
+            $siteId = null;
+        }
+
         $draft = Entry::find()
             ->id($draftId)
+            ->siteId($siteId !== null ? (int)$siteId : null)
             ->drafts(true)
             ->provisionalDrafts(false)
             ->status(null)
@@ -93,6 +100,11 @@ class DiffController extends Controller
         $user = Craft::$app->getUser()->getIdentity();
 
         if ($user === null || !$elements->canView($draft, $user) || !$elements->canView($canonical, $user)) {
+            throw new ForbiddenHttpException('You can’t view this draft.');
+        }
+
+        // canView() doesn't check site access; Craft's editor does, on multi-site installs
+        if (Craft::$app->getIsMultiSite() && !$user->can('editSite:' . $draft->getSite()->uid)) {
             throw new ForbiddenHttpException('You can’t view this draft.');
         }
 
