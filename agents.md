@@ -196,6 +196,8 @@ Same names and shapes as Peek 6 (shared spec); change both or neither.
 
 **GraphQL** (`src/gql/`) — scopes `peekDrafts:read`, `peekReleases:read` (group "Peek"); queries in `queries/PeekQueries.php`, resolvers in `resolvers/PeekResolver.php`, access rules in `GqlAccess.php`. Public schema → nothing; drafts also need `elements.drafts:read`; drafts/diffs/release entries only in readable sections + sites; releases on unreadable sites dropped, `entryCount` counts readable entries only.
 
+GraphQL diffs call `diffEntry($draft, $canonical, redactRelations: true)`: every relation field (any `BaseRelationField`, the element-query fallback, nested Matrix) serializes as "{n} related element(s)" / "(none)" for `oldValue`/`newValue`/`diffHtml`, while `hasChanges` uses the full serialization. CP and MCP don't redact.
+
 **Nav** — `navLabel`/`navIcon`/`navIconSvg` on `Settings` (FreeLink's validation; `Settings::iconExists()`, `isSvgMarkup()`), applied in `getCpNavItem()`: SVG (sanitized with `Html::svg()` on every render) > icon name > Peek's icon.
 
 **Shared visibility** — `DraftService::canViewEntry()` (canView + `editSite:` on multi-site) is the one rule for the dashboard, release-screen titles, MCP and `unauthorizedEntries()` titles. `getViewableDraft()` / `canViewDiff()` back DiffController and `peek_draft_diff`.
@@ -343,7 +345,7 @@ src/
 ```sh
 # Codeception (unit + integration) from the PHP 8.4 runner, against a throwaway DB on the harness MySQL
 docker exec ddev-plugin-testing-db mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS craft_peek_test"
-docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 203 tests
+docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 205 tests
 
 # Controllers and screens over HTTP, in the plugin-testing harness
 docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/security.php   # 19 checks

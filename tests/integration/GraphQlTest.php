@@ -3,7 +3,13 @@
 namespace justinholtweb\peek\tests\integration;
 
 use Craft;
+use craft\elements\Entry;
+use craft\fieldlayoutelements\CustomField;
+use craft\fields\Entries as EntriesField;
+use craft\fields\Matrix;
 use craft\gql\GqlEntityRegistry;
+use craft\models\EntryType;
+use craft\models\FieldLayout;
 use craft\models\GqlSchema;
 use justinholtweb\peek\gql\queries\PeekQueries;
 use justinholtweb\peek\gql\resolvers\PeekResolver;
@@ -227,5 +233,92 @@ GQL);
 
         $this->assertArrayHasKey('errors', $result);
         $this->assertStringContainsString('peekReleases', $result['errors'][0]['message']);
+    }
+
+    /**
+     * An Entries field (`related`) on the test entry type, and a Matrix field (`blocks`) whose
+     * block type has its own Entries field (`blockRelated`).
+     */
+    private function addRelationFields(): void
+    {
+        $this->ensureSection();
+
+        $related = new EntriesField(['name' => 'Related', 'handle' => 'related', 'sources' => '*']);
+        $this->assertTrue(Craft::$app->getFields()->saveField($related), json_encode($related->getErrors()));
+        $blockRelated = new EntriesField(['name' => 'Block Related', 'handle' => 'blockRelated', 'sources' => '*']);
+        $this->assertTrue(Craft::$app->getFields()->saveField($blockRelated), json_encode($blockRelated->getErrors()));
+
+        $blockLayout = new FieldLayout(['type' => Entry::class]);
+        $blockLayout->setTabs([['name' => 'Content', 'elements' => [new CustomField($blockRelated)]]]);
+        $blockType = new EntryType(['name' => 'Link Block', 'handle' => 'linkBlock', 'hasTitleField' => false]);
+        $blockType->setFieldLayout($blockLayout);
+        $this->assertTrue(Craft::$app->getEntries()->saveEntryType($blockType));
+
+        $matrix = new Matrix(['name' => 'Blocks', 'handle' => 'blocks']);
+        $matrix->setEntryTypes([$blockType]);
+        $this->assertTrue(Craft::$app->getFields()->saveField($matrix), json_encode($matrix->getErrors()));
+
+        $layout = $this->entryType->getFieldLayout();
+        $tab = $layout->getTabs()[0];
+        $tab->setElements([...$tab->getElements(), new CustomField($related), new CustomField($matrix)]);
+        $layout->setTabs([$tab]);
+        $this->entryType->setFieldLayout($layout);
+        $this->assertTrue(Craft::$app->getEntries()->saveEntryType($this->entryType));
+    }
+
+    /**
+     * @param int[] $ids
+     */
+    private function linkBlock(array $ids): array
+    {
+        return ['new1' => ['type' => 'linkBlock', 'enabled' => true, 'fields' => ['blockRelated' => $ids]]];
+    }
+
+    public function testRelationsInADiffAreCountsNotTitles(): void
+    {
+        $this->addRelationFields();
+        $first = $this->createEntry('Secret target one');
+        $second = $this->createEntry('Secret target two');
+        $canonical = $this->createEntry('Relating', ['related' => [$first->id], 'blocks' => $this->linkBlock([$first->id])]);
+        $draft = $this->createDraft($canonical, [], [
+            'related' => [$second->id],
+            'blocks' => $this->linkBlock([$first->id, $second->id]),
+        ]);
+        $this->schema($this->fullScope());
+
+        $diff = PeekResolver::draftDiff(null, ['draftId' => $draft->id, 'includeUnchanged' => true]);
+        $fields = array_column($diff['fields'], null, 'handle');
+
+        // Swapping one related entry for another is still a change, though the counts match.
+        $this->assertTrue($fields['related']['changed']);
+        $this->assertSame('1 related element', $fields['related']['oldValue']);
+        $this->assertSame('1 related element', $fields['related']['newValue']);
+
+        $this->assertTrue($fields['blocks']['changed']);
+        $this->assertStringContainsString('Block Related: 1 related element', $fields['blocks']['oldValue']);
+        $this->assertStringContainsString('Block Related: 2 related elements', $fields['blocks']['newValue']);
+
+        $json = json_encode($diff);
+        foreach (['Secret target', "#{$first->id})", "#{$second->id})"] as $leak) {
+            $this->assertStringNotContainsString($leak, $json);
+        }
+
+        // The control panel and MCP still show what the relations are.
+        $full = array_column(array_map(fn($d) => $d->toArray(), $this->diff()->diffEntry($draft, $draft->getCanonical())), null, 'handle');
+        $this->assertSame("Secret target two (#{$second->id})", $full['related']['newValue']);
+    }
+
+    public function testAnEmptyRelationStaysNone(): void
+    {
+        $this->addRelationFields();
+        $target = $this->createEntry('Secret target');
+        $canonical = $this->createEntry('Was related', ['related' => [$target->id]]);
+        $draft = $this->createDraft($canonical, [], ['related' => []]);
+        $this->schema($this->fullScope());
+
+        $fields = array_column(PeekResolver::draftDiff(null, ['draftId' => $draft->id])['fields'], null, 'handle');
+
+        $this->assertSame('1 related element', $fields['related']['oldValue']);
+        $this->assertSame('(none)', $fields['related']['newValue']);
     }
 }

@@ -8,6 +8,7 @@ use craft\base\FieldInterface;
 use craft\elements\Asset;
 use craft\elements\Entry;
 use craft\fields\Assets as AssetsField;
+use craft\fields\BaseRelationField;
 use craft\fields\Categories as CategoriesField;
 use craft\fields\Color as ColorField;
 use craft\fields\Date as DateField;
@@ -30,9 +31,14 @@ class DiffService extends Component
     /**
      * Compare a draft entry against its canonical version field by field.
      *
+     * With `$redactRelations`, relation fields (anywhere, including inside Matrix blocks) show
+     * only how many elements they hold — "2 related elements" — never their titles or IDs.
+     * Whether a field changed is still decided on the full values. GraphQL uses this: a schema's
+     * section scope covers the draft, not whatever it relates to.
+     *
      * @return FieldDiff[]
      */
-    public function diffEntry(Entry $draft, Entry $canonical): array
+    public function diffEntry(Entry $draft, Entry $canonical, bool $redactRelations = false): array
     {
         $diffs = [];
 
@@ -79,7 +85,7 @@ class DiffService extends Component
         if ($fieldLayout) {
             foreach ($fieldLayout->getCustomFields() as $field) {
                 try {
-                    $diffs[] = $this->_diffField($field, $draft, $canonical);
+                    $diffs[] = $this->_diffField($field, $draft, $canonical, $redactRelations);
                 } catch (\Throwable $e) {
                     // A third-party field we can't serialize shouldn't take down the whole diff
                     Craft::warning("Couldn't diff field \"{$field->handle}\": {$e->getMessage()}", __METHOD__);
@@ -140,7 +146,7 @@ class DiffService extends Component
         return UrlHelper::urlWithToken($url, $token);
     }
 
-    private function _diffField(FieldInterface $field, Entry $draft, Entry $canonical): FieldDiff
+    private function _diffField(FieldInterface $field, Entry $draft, Entry $canonical, bool $redact = false): FieldDiff
     {
         $handle = $field->handle;
         $oldValue = $canonical->getFieldValue($handle);
@@ -154,9 +160,16 @@ class DiffService extends Component
         $diff->handle = $handle;
         $diff->label = $field->name;
         $diff->type = get_class($field);
+        // Changed or not on the full values: swapping one related element for another is a change
+        $diff->hasChanges = $oldStr !== $newStr;
+
+        if ($redact) {
+            $oldStr = $this->_fieldValueToString($field, $oldValue, $canonical, 0, true);
+            $newStr = $this->_fieldValueToString($field, $newValue, $draft, 0, true);
+        }
+
         $diff->oldValue = $oldStr;
         $diff->newValue = $newStr;
-        $diff->hasChanges = $oldStr !== $newStr;
 
         if ($diff->hasChanges) {
             // Lightswitch gets special boolean rendering
@@ -190,13 +203,18 @@ class DiffService extends Component
      * Serialize a field value to a comparable string representation.
      * Each field type gets appropriate treatment.
      */
-    private function _fieldValueToString(FieldInterface $field, mixed $value, ?ElementInterface $owner = null, int $depth = 0): string
+    private function _fieldValueToString(FieldInterface $field, mixed $value, ?ElementInterface $owner = null, int $depth = 0, bool $redact = false): string
     {
         // Matrix — compare blocks by what's in them. A draft gets its own copy of every block it
         // touches, with a new ID, so before 5.1.2 an edited-then-reverted block read as a change
         // and the diff showed nothing but "(#id)" lines (issue #3).
         if ($field instanceof MatrixField) {
-            return $this->_nestedEntriesToString($field, $value, $owner, $depth);
+            return $this->_nestedEntriesToString($field, $value, $owner, $depth, $redact);
+        }
+
+        // Redacted: any relation field, core or third-party, is only a count
+        if ($redact && $field instanceof BaseRelationField) {
+            return $this->_relationCount($value);
         }
 
         if ($value === null) {
@@ -273,7 +291,7 @@ class DiffService extends Component
 
         // Element queries (generic relation fallback)
         if ($value instanceof \craft\elements\db\ElementQueryInterface) {
-            return $this->_relationsToString($value);
+            return $redact ? $this->_relationCount($value) : $this->_relationsToString($value);
         }
 
         // CKEditor / objects with __toString — strip HTML for text diff
@@ -301,7 +319,7 @@ class DiffService extends Component
      * so the entry open in the editor (whose field value may be a preloaded set) and the diff
      * page read the same thing.
      */
-    private function _nestedEntriesToString(MatrixField $field, mixed $value, ?ElementInterface $owner, int $depth): string
+    private function _nestedEntriesToString(MatrixField $field, mixed $value, ?ElementInterface $owner, int $depth, bool $redact = false): string
     {
         if ($owner !== null && $owner->id) {
             $entries = $field->normalizeValue(null, $owner)->status(null)->all();
@@ -321,7 +339,7 @@ class DiffService extends Component
 
         // Matrix inside Matrix inside… — past this, fall back to IDs
         if ($depth >= 4) {
-            return $this->_relationsToString($entries);
+            return $redact ? $this->_relationCount($entries) : $this->_relationsToString($entries);
         }
 
         $blocks = [];
@@ -339,7 +357,7 @@ class DiffService extends Component
 
             foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $nestedField) {
                 try {
-                    $str = $this->_fieldValueToString($nestedField, $entry->getFieldValue($nestedField->handle), $entry, $depth + 1);
+                    $str = $this->_fieldValueToString($nestedField, $entry->getFieldValue($nestedField->handle), $entry, $depth + 1, $redact);
                 } catch (\Throwable $e) {
                     Craft::warning("Couldn't diff nested field \"{$nestedField->handle}\": {$e->getMessage()}", __METHOD__);
                     $str = '?';
@@ -370,6 +388,28 @@ class DiffService extends Component
         );
 
         return $json === false ? '' : $json;
+    }
+
+    /**
+     * A relation value as only its size: "1 related element", "3 related elements", or "(none)".
+     */
+    private function _relationCount(mixed $value): string
+    {
+        if ($value instanceof \craft\elements\db\ElementQueryInterface) {
+            $count = (int)(clone $value)->count();
+        } elseif ($value instanceof Collection) {
+            $count = $value->count();
+        } elseif (is_array($value)) {
+            $count = count($value);
+        } else {
+            return '';
+        }
+
+        if ($count === 0) {
+            return '(none)';
+        }
+
+        return Craft::t('peek', '{n, plural, =1{# related element} other{# related elements}}', ['n' => $count]);
     }
 
     /**

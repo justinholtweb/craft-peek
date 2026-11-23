@@ -73,7 +73,8 @@ class PeekResolver
             return null;
         }
 
-        $diffs = $plugin->diff->diffEntry($draft, $canonical);
+        // Relations show as counts: the schema's scopes cover this draft, not what it relates to
+        $diffs = $plugin->diff->diffEntry($draft, $canonical, redactRelations: true);
         $changed = array_values(array_filter($diffs, fn(FieldDiff $diff) => $diff->hasChanges));
 
         return [

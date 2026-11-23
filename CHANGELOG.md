@@ -50,6 +50,7 @@ Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-peek/b
 ### Security
 - On multi-site installs, the dashboard and the release screen listed drafts in sites the viewer had no access to. They now need the same Edit site permission as Craft's entry editor, like the diff screen since 5.1.2
 - A refused publish named every draft the publisher couldn't apply, including ones they couldn't view. Those are now named by entry number
+- GraphQL's `peekDraftDiff` shows relation fields (Entries, Categories, Users, Assets and other relation fields, including inside Matrix blocks) as a count, such as “2 related elements”, never the related elements' titles or IDs, since a schema's scopes cover the draft and not what it relates to. Whether the field changed is still decided on the full values. The control panel and MCP diffs are unchanged
 
 ## 5.1.2 - 2026-11-23
 
