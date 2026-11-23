@@ -152,6 +152,14 @@ it('redacts anything holding elements, and objects it can’t see into', functio
             }
         }))->toBe('(not shown over GraphQL)')
         ->and($redact([['col1' => 'plain']]))->toContain('plain')
+        ->and($redact([['when' => new DateTimeImmutable('2030-01-02 03:04:05')]]))->toContain('2030-01-02 03:04:05')
+        ->and($redact([['x' => new class implements JsonSerializable
+        {
+            public function jsonSerialize(): mixed
+            {
+                return 'LEAKED';
+            }
+        }]]))->toBe('(not shown over GraphQL)')
         ->and($redact('just text'))->toBe('just text')
         ->and($redact(new class implements Stringable
         {

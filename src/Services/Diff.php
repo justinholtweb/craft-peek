@@ -284,6 +284,11 @@ class Diff
                 return trim(strip_tags($raw));
             } elseif (is_object($value) && ! $value instanceof DateTimeInterface && ! $value instanceof ElementQueryInterface) {
                 return '(not shown over GraphQL)';
+            } elseif (is_array($value)) {
+                // Only plain data: an object inside would be serialized by its own rules.
+                $plain = self::plainData($value);
+
+                return $plain === null ? '(not shown over GraphQL)' : $this->toJson($plain);
             }
         }
 
@@ -497,6 +502,38 @@ class Diff
         }
 
         return $count;
+    }
+
+    /**
+     * The value with dates formatted, if it holds only nulls, scalars, dates and arrays of them
+     * (a few levels deep); otherwise null.
+     */
+    private static function plainData(mixed $value, int $depth = 0): mixed
+    {
+        if ($value === null || is_scalar($value)) {
+            return $value;
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        if (! is_array($value) || $depth >= 5) {
+            return null;
+        }
+
+        $plain = [];
+        foreach ($value as $key => $item) {
+            $converted = self::plainData($item, $depth + 1);
+
+            if ($converted === null && $item !== null) {
+                return null;
+            }
+
+            $plain[$key] = $converted;
+        }
+
+        return $plain;
     }
 
     private function scalarString(mixed $value): string
