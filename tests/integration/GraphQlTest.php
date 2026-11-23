@@ -369,6 +369,42 @@ GQL);
         // Values without elements are shown as before.
         $this->assertSame('plain', $redacted('plain'));
         $this->assertStringContainsString('"a": 1', $redacted(['a' => 1]));
+        $this->assertSame('[]', $redacted(collect([])), 'An empty collection holds nothing to hide.');
+        $this->assertSame('2026-11-23 10:00:00', $redacted(new \DateTime('2026-11-23 10:00:00')));
+
+        // A third-party object without elements still isn't shown: Peek can't vouch for what's in it.
+        $this->assertSame('(not shown over GraphQL)', $redacted((object)['secret' => 'value']));
+        $this->assertSame('(not shown over GraphQL)', $redacted(new \craft\models\Section()));
+        $this->assertSame('(not shown over GraphQL)', $redacted(new class() implements \Stringable {
+            public function __toString(): string
+            {
+                return 'RENDERED SECRET';
+            }
+        }));
+
+        // Rich text is read from its stored HTML, never rendered, and loses its reference tags.
+        $richText = new class() implements \Stringable {
+            public function getRawContent(): string
+            {
+                return '<p>Hi <a href="{entry:1@1:url}">x</a></p>';
+            }
+
+            public function __toString(): string
+            {
+                return 'RENDERED SECRET';
+            }
+        };
+        $text = $redacted($richText);
+        $this->assertStringContainsString('Hi x', $text);
+        $this->assertStringNotContainsString('RENDERED SECRET', $text);
+        $this->assertStringNotContainsString('{entry', $text);
+        $this->assertSame('RENDERED SECRET', $serialize->invoke($this->diff(), $field, $richText, null, 0, false), 'Unredacted (CP, MCP) is unchanged.');
+        $this->assertSame('(not shown over GraphQL)', $redacted(new class() implements \JsonSerializable {
+            public function jsonSerialize(): mixed
+            {
+                return ['secret' => 'value'];
+            }
+        }));
 
         $this->assertStringContainsString('Secret one', $serialize->invoke($this->diff(), $field, [$first], null, 0, false), 'Unredacted (CP, MCP) is unchanged.');
     }

@@ -51,7 +51,7 @@ Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-peek/b
 - On multi-site installs, the dashboard and the release screen listed drafts in sites the viewer had no access to. They now need the same Edit site permission as Craft's entry editor, like the diff screen since 5.1.2
 - A refused publish named every draft the publisher couldn't apply, including ones they couldn't view. Those are now named by entry number
 - GraphQL's `peekDraftDiff` shows relation fields (Entries, Categories, Users, Assets and other relation fields, including inside Matrix blocks) as a count, such as “2 related elements”, never the related elements' titles or IDs, since a schema's scopes cover the draft and not what it relates to. Whether the field changed is still decided on the full values. The control panel and MCP diffs are unchanged
-- In GraphQL diffs, a Link field pointing at an element shows “1 linked element” instead of the element's URL, and any other value that holds elements (arrays, collections, third-party objects) shows only how many, so nothing a schema can't read reaches it through a field Peek doesn't know
+- In GraphQL diffs, a Link field pointing at an element shows “1 linked element” instead of the element's URL, any other value that holds elements (arrays, collections, third-party objects) shows only how many, rich text is read from its stored HTML with reference tags removed, never rendered (rendering can pull in other elements), and any other object value — a third-party field's — shows “(not shown over GraphQL)”, so nothing a schema can't read reaches it through a field Peek doesn't know. Element-free arrays, such as Table fields, are still shown
 
 ## 5.1.2 - 2026-11-23
 

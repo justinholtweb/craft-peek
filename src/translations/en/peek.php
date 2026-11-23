@@ -137,4 +137,5 @@ return [
     'Applying a draft failed, so nothing was published. Check the peek log.' => 'Applying a draft failed, so nothing was published. Check the peek log.',
     '{n, plural, =1{# related element} other{# related elements}}' => '{n, plural, =1{# related element} other{# related elements}}',
     '1 linked element' => '1 linked element',
+    '(not shown over GraphQL)' => '(not shown over GraphQL)',
 ];

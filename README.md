@@ -121,8 +121,20 @@ Drafts are unpublished content, so:
   include only entries the schema could read.
 - Without the matching scope, the queries aren't in the schema at all.
 
-Field values are the text Peek compares (rich text without its HTML, relations as `Title (#id)`
-lines); booleans, such as `enabled`, are `On` or `Off`. There are no mutations.
+Field values are the text Peek compares, with anything the schema might not be allowed to read left
+out:
+
+- Related elements (Entries, Categories, Users, Assets and other relation fields, also inside
+  Matrix blocks) are only counted: `1 related element`, `3 related elements`, or `(none)`.
+- A Link field pointing at an element is `1 linked element`; a plain URL link is shown.
+- Rich text is read from its stored HTML, without its tags and reference tags, and is never
+  rendered (rendering can pull in other elements).
+- Any other object value, such as a third-party field's, is `(not shown over GraphQL)`.
+- Booleans, such as `enabled`, are `On` or `Off`.
+
+`changed` is still decided on the full values, so swapping one related entry for another shows as a
+change even though both sides read `1 related element`. The control panel and MCP diffs show
+everything the viewer may see. There are no mutations.
 
 ## Permissions
 

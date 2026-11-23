@@ -231,6 +231,22 @@ class DiffService extends Component
             if ($elements !== null) {
                 return $elements === 0 ? '(none)' : $this->_relatedText($elements);
             }
+
+            if ($value instanceof Collection) {
+                // Element-free: read as the array it is, below.
+            } elseif (is_object($value) && method_exists($value, 'getRawContent')) {
+                // Rich text (CKEditor, HtmlFieldData). Never render it: rendering resolves reference
+                // tags and nested entries, which can pull in other elements. The stored HTML, minus
+                // reference tags, is the draft's own text.
+                $raw = (string)$value->getRawContent();
+                $raw = (string)preg_replace('/\{[a-z][a-z0-9_-]*:[^}]*\}/i', '', $raw);
+
+                return trim(strip_tags($raw));
+            } elseif (is_object($value) && !$value instanceof \DateTimeInterface) {
+                // Any other object — a third-party field's value, Stringable or not — is something
+                // Peek can't vouch for. Element-free arrays (Table fields) are still shown.
+                return Craft::t('peek', '(not shown over GraphQL)');
+            }
         }
 
         if ($value === null) {
