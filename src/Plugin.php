@@ -5,34 +5,49 @@ declare(strict_types=1);
 namespace JustinHoltWeb\Peek;
 
 use CraftCms\Cms\Cp\Data\NavItem;
+use CraftCms\Cms\Cp\Icons as CpIcons;
+use CraftCms\Cms\Cp\IconSets;
 use CraftCms\Cms\Element\Events\DraftApplied;
 use CraftCms\Cms\Element\Events\DraftApplying;
 use CraftCms\Cms\Element\Events\ElementDeleting;
 use CraftCms\Cms\Element\Events\ElementMetadataResolving;
+use CraftCms\Cms\Gql\Events\GqlSchemaComponentsResolving;
+use CraftCms\Cms\Mcp\CapabilityRegistry;
 use CraftCms\Cms\Plugin\Plugin as BasePlugin;
 use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Html;
 use CraftCms\Cms\Ui\Controls\Choice;
+use CraftCms\Cms\Ui\Controls\IconPicker;
 use CraftCms\Cms\Ui\Controls\Lightswitch;
 use CraftCms\Cms\Ui\Controls\Number;
+use CraftCms\Cms\Ui\Controls\Text;
+use CraftCms\Cms\Ui\Controls\Textarea;
 use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\Ui\Nodes\Heading;
 use CraftCms\Cms\Ui\Ui;
 use CraftCms\Cms\Ui\UiContext;
 use CraftCms\Cms\User\Data\Permission;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use JustinHoltWeb\Peek\Console\Commands\MoveToCraftCommand;
 use JustinHoltWeb\Peek\Console\Commands\ReleasesListCommand;
 use JustinHoltWeb\Peek\Console\Commands\ReleasesPublishCommand;
 use JustinHoltWeb\Peek\Console\Commands\ReleasesStatusCommand;
 use JustinHoltWeb\Peek\Console\Commands\SchedulerCheckCommand;
+use JustinHoltWeb\Peek\Gql\GqlAccess;
+use JustinHoltWeb\Peek\Gql\Queries\PeekQueries;
 use JustinHoltWeb\Peek\Listeners\AddEditorMetadata;
 use JustinHoltWeb\Peek\Listeners\RemoveDiscardedDraft;
 use JustinHoltWeb\Peek\Listeners\TrackAppliedDraft;
+use JustinHoltWeb\Peek\Mcp\PeekTools;
 use JustinHoltWeb\Peek\Models\Settings;
 use JustinHoltWeb\Peek\Services\Diff;
 use JustinHoltWeb\Peek\Services\PendingDrafts;
 use JustinHoltWeb\Peek\Services\Releases;
 use JustinHoltWeb\Peek\Services\ReleaseSystem;
 use Override;
+use Throwable;
 
 use function CraftCms\Cms\currentUser;
 use function CraftCms\Cms\t;
@@ -87,6 +102,10 @@ class Plugin extends BasePlugin
         MoveToCraftCommand::class,
     ];
 
+    protected array $gqlQueries = [
+        PeekQueries::class,
+    ];
+
     protected array $events = [
         DraftApplying::class => TrackAppliedDraft::class,
         DraftApplied::class => TrackAppliedDraft::class,
@@ -110,9 +129,19 @@ class Plugin extends BasePlugin
         }
     }
 
-    public function boot(): void
+    public function boot(CapabilityRegistry $capabilities): void
     {
         $this->app->bind(Settings::class, fn () => $this->getSettings());
+
+        // MCP: the tools are on Craft's own server (`php artisan craft:mcp:serve`, or HTTP).
+        $capabilities->register(PeekTools::class);
+
+        Event::listen(GqlSchemaComponentsResolving::class, function (GqlSchemaComponentsResolving $event): void {
+            $event->queries[t('Peek', category: 'peek')] = [
+                GqlAccess::SCOPE_DRAFTS.':read' => ['label' => t('Query drafts and their diffs (peekDrafts, peekDraftDiff). Also needs “Query for element drafts”.', category: 'peek')],
+                GqlAccess::SCOPE_RELEASES.':read' => ['label' => t('Query releases (peekReleases, peekRelease)', category: 'peek')],
+            ];
+        });
     }
 
     /**
@@ -195,7 +224,48 @@ class Plugin extends BasePlugin
             $subnav[] = new NavItem()->label(t('Settings', category: 'peek'))->href('settings/plugins/peek');
         }
 
-        return $item->subnav($subnav);
+        return $this->customiseNavItem($item->subnav($subnav), $this->getSettings());
+    }
+
+    /**
+     * The sidebar label and icon from settings: label, then pasted SVG (sanitised every time it's
+     * drawn), then an icon name. Craft's own Settings → Control Panel Navigation overrides win,
+     * because Craft applies them afterwards.
+     */
+    public function customiseNavItem(NavItem $item, Settings $settings): NavItem
+    {
+        $label = trim((string) $settings->navLabel);
+
+        if ($label !== '') {
+            $item->label($label);
+        }
+
+        $svg = trim((string) $settings->navIconSvg);
+        $icon = trim((string) $settings->navIcon);
+
+        try {
+            if ($svg !== '' && Settings::isSvgMarkup($svg)) {
+                $sanitised = Html::svg($svg, sanitize: true, namespace: true);
+
+                if ($sanitised !== '') {
+                    return $item->iconSvg($sanitised)->icon(null);
+                }
+            }
+
+            if ($icon !== '' && IconSets::parse($icon) !== null) {
+                // A custom set's icon (`set:name`) is drawn server-side.
+                return $item->iconSvg(CpIcons::svg($icon))->icon(null);
+            }
+
+            if ($icon !== '' && Settings::iconExists($icon)) {
+                return $item->icon($icon)->iconSvg(null);
+            }
+        } catch (Throwable $e) {
+            // A bad icon setting must never take the nav down.
+            Log::warning('Peek couldn’t draw the custom nav icon: '.$e->getMessage());
+        }
+
+        return $item;
     }
 
     #[Override]
@@ -208,6 +278,16 @@ class Plugin extends BasePlugin
         }
 
         return Ui::make([
+            Heading::make('peek-nav', t('Control panel', category: 'peek'))
+                ->description(t('How Peek appears in the control panel’s sidebar. An override set in Settings → Control Panel Navigation takes precedence.', category: 'peek')),
+            Field::make(t('Sidebar label', category: 'peek'), Text::make('navLabel')->placeholder('Peek'))
+                ->instructions(t('Leave empty for “Peek”.', category: 'peek')),
+            Field::make(t('Sidebar icon', category: 'peek'), IconPicker::make('navIcon'))
+                ->instructions(t('Leave empty for Peek’s own icon.', category: 'peek')),
+            Field::make(t('Custom SVG icon', category: 'peek'), Textarea::make('navIconSvg')->rows(4)->monospace())
+                ->instructions(t('Optional. Paste one `<svg>` element to use instead of the icon above. It’s sanitised every time it’s drawn; a single-colour icon using `currentColor` matches the rest of the sidebar.', category: 'peek')),
+
+            Heading::make('peek-drafts', t('Drafts and diffs', category: 'peek')),
             Field::make(t('Stale draft threshold', category: 'peek'), Number::make('staleDraftDays')->min(1)->suffix(t('days', category: 'peek')))
                 ->instructions(t('Drafts with no save in this many days are flagged on the dashboard.', category: 'peek'))
                 ->required(),
@@ -215,9 +295,23 @@ class Plugin extends BasePlugin
                 ->instructions(t('The site new releases start on. Applies to Peek’s own releases (Craft Solo and Team).', category: 'peek')),
             Field::make(t('Visual preview', category: 'peek'), Lightswitch::make('enableVisualPreview'))
                 ->instructions(t('Show the live page and the draft side by side on the diff screen.', category: 'peek')),
+            Field::make(t('Dashboard refresh', category: 'peek'), Number::make('dashboardRefreshSeconds')->min(0)->max(3600)->suffix(t('seconds', category: 'peek')))
+                ->instructions(t('How often an open dashboard updates itself. With Laravel broadcasting set up (and Echo on the page) it updates live instead. 0 turns this off.', category: 'peek')),
+
+            Heading::make('peek-releases', t('Releases', category: 'peek')),
             Field::make(t('Most drafts per release', category: 'peek'), Number::make('maxEntriesPerRelease')->min(1)->max(500))
                 ->instructions(t('Applies to Peek’s own releases.', category: 'peek'))
                 ->required(),
+            Field::make(t('Tell people when a scheduled release fails', category: 'peek'), Lightswitch::make('notifyOnFailure'))
+                ->instructions(t('Emails the person who scheduled it, and the addresses and Slack webhook below. Applies to Peek’s own releases; Craft notifies about its own.', category: 'peek')),
+            Field::make(t('Also email', category: 'peek'), Text::make('failureEmails')->placeholder('ops@example.com, editor@example.com'))
+                ->instructions(t('Comma-separated, or an environment variable like `$PEEK_FAILURE_EMAILS`.', category: 'peek')),
+            Field::make(t('Slack webhook URL', category: 'peek'), Text::make('failureSlackWebhookUrl')->placeholder('$PEEK_SLACK_WEBHOOK'))
+                ->instructions(t('A Slack incoming-webhook URL, or an environment variable. Keep the URL itself in `.env`.', category: 'peek')),
+            Field::make(t('Publish webhook URL', category: 'peek'), Text::make('publishWebhookUrl')->placeholder('$PEEK_PUBLISH_WEBHOOK'))
+                ->instructions(t('Peek POSTs a JSON summary here whenever a release publishes, Peek’s or Craft’s: for a CDN purge, a static rebuild or a deploy hook. Sent from the queue, retried on failure.', category: 'peek')),
+            Field::make(t('Publish webhook secret', category: 'peek'), Text::make('publishWebhookSecret')->placeholder('$PEEK_WEBHOOK_SECRET'))
+                ->instructions(t('Optional. Signs each body as `X-Peek-Signature: sha256=<HMAC>`. Use an environment variable.', category: 'peek')),
         ]);
     }
 }
