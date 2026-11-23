@@ -14,6 +14,7 @@ use JustinHoltWeb\Peek\Plugin;
 
 Route::middleware('can:'.Plugin::PERMISSION_ACCESS)->group(function () {
     Route::get('peek', DashboardController::class)->name('peek');
+    Route::get('peek/dashboard/fragment', [DashboardController::class, 'fragment'])->name('peek.dashboard.fragment');
 
     Route::middleware('can:'.Plugin::PERMISSION_VIEW_DIFFS)->group(function () {
         Route::get('peek/diff/{draftId}', [DiffController::class, 'show'])->whereNumber('draftId')->name('peek.diff');

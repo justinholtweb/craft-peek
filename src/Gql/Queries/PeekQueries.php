@@ -7,6 +7,7 @@ namespace JustinHoltWeb\Peek\Gql\Queries;
 use CraftCms\Cms\Entry\Elements\Entry;
 use CraftCms\Cms\Gql\GqlHelper;
 use CraftCms\Cms\Gql\Queries\Query;
+use CraftCms\Cms\Support\Facades\Sites;
 use GraphQL\Type\Definition\Type;
 use JustinHoltWeb\Peek\Data\FieldDiff;
 use JustinHoltWeb\Peek\Data\ReleaseSummary;
@@ -180,10 +181,14 @@ final class PeekQueries extends Query
 
         $releases = array_filter(
             $system->all(status: $status),
-            fn (ReleaseSummary $r) => $r->source === ReleaseSummary::SOURCE_PEEK || GqlAccess::canQueryCraftReleases(),
+            fn (ReleaseSummary $r) => $r->source === ReleaseSummary::SOURCE_PEEK ? self::siteReadable($r) : GqlAccess::canQueryCraftReleases(),
         );
 
-        return array_values(array_map(fn (ReleaseSummary $r) => Presenter::release($r), $releases));
+        return array_values(array_map(function (ReleaseSummary $r) use ($system): array {
+            $full = $system->find($r->source, $r->id, withEntries: true) ?? $r;
+
+            return self::presentRelease($full);
+        }, $releases));
     }
 
     /**
@@ -205,11 +210,32 @@ final class PeekQueries extends Query
 
         $release = $system->find($from, (int) $arguments['id'], withEntries: true);
 
-        if ($release === null) {
+        if ($release === null || ($release->source === ReleaseSummary::SOURCE_PEEK && ! self::siteReadable($release))) {
             return null;
         }
 
-        // Entries in sections or sites the schema can't read aren't listed.
+        return self::presentRelease($release);
+    }
+
+    /** A Peek release belongs to a site: the schema must be able to read it. */
+    private static function siteReadable(ReleaseSummary $release): bool
+    {
+        if ($release->site === null) {
+            return true;
+        }
+
+        $site = Sites::getSiteByHandle($release->site, true);
+
+        return $site !== null && in_array((int) $site->id, GqlAccess::readableSiteIds(), true);
+    }
+
+    /**
+     * Only entries in sections and sites the schema can read are listed, and counted.
+     *
+     * @return array<string, mixed>
+     */
+    private static function presentRelease(ReleaseSummary $release): array
+    {
         $sites = GqlAccess::readableSiteIds();
 
         $entries = $sites === [] ? [] : array_values(array_filter($release->entries, function (array $entry) use ($sites): bool {
@@ -218,6 +244,9 @@ final class PeekQueries extends Query
             return $canonical instanceof Entry && GqlAccess::canReadEntry($canonical);
         }));
 
-        return Presenter::release($release, $entries);
+        $data = Presenter::release($release, $entries);
+        $data['entryCount'] = count($entries);
+
+        return $data;
     }
 }

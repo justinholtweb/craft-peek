@@ -1,0 +1,22 @@
+<div class="peek-widget">
+    <div class="peek-widget-stats">
+        <a href="{{ dashboardUrl }}"><strong>{{ pendingCount }}</strong> {{ 'drafts'|t('peek') }}</a>
+        <span{% if staleCount %} class="peek-stat--warning"{% endif %}><strong>{{ staleCount }}</strong> {{ 'stale'|t('peek') }}</span>
+        {% if activeReleases is not null %}
+            <a href="{{ releasesUrl }}"><strong>{{ activeReleases }}</strong> {{ 'open releases'|t('peek') }}</a>
+        {% endif %}
+    </div>
+    {% if drafts|length %}
+        <ul class="peek-widget-list">
+            {% for draft in drafts %}
+                <li>
+                    <a href="{{ draft.editUrl }}">{{ draft.title }}</a>
+                    <span class="peek-light">{{ draft.section }} · {{ draft.dateUpdated|datetime('short') }}</span>
+                    {% if draft.diffUrl %}<a class="peek-btn" href="{{ draft.diffUrl }}">{{ 'Diff'|t('peek') }}</a>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="peek-light">{{ 'Nothing waiting.'|t('peek') }}</p>
+    {% endif %}
+</div>

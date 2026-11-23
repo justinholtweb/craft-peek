@@ -9,11 +9,14 @@ use CraftCms\Cms\Cp\Icons as CpIcons;
 use CraftCms\Cms\Cp\IconSets;
 use CraftCms\Cms\Element\Events\DraftApplied;
 use CraftCms\Cms\Element\Events\DraftApplying;
+use CraftCms\Cms\Element\Events\ElementDeleted;
 use CraftCms\Cms\Element\Events\ElementDeleting;
 use CraftCms\Cms\Element\Events\ElementMetadataResolving;
+use CraftCms\Cms\Element\Events\ElementSaved;
 use CraftCms\Cms\Gql\Events\GqlSchemaComponentsResolving;
 use CraftCms\Cms\Mcp\CapabilityRegistry;
 use CraftCms\Cms\Plugin\Plugin as BasePlugin;
+use CraftCms\Cms\Release\Events\ReleasePublished;
 use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Html;
 use CraftCms\Cms\Ui\Controls\Choice;
@@ -35,9 +38,13 @@ use JustinHoltWeb\Peek\Console\Commands\ReleasesListCommand;
 use JustinHoltWeb\Peek\Console\Commands\ReleasesPublishCommand;
 use JustinHoltWeb\Peek\Console\Commands\ReleasesStatusCommand;
 use JustinHoltWeb\Peek\Console\Commands\SchedulerCheckCommand;
+use JustinHoltWeb\Peek\Events\PeekReleasePublished;
 use JustinHoltWeb\Peek\Gql\GqlAccess;
 use JustinHoltWeb\Peek\Gql\Queries\PeekQueries;
 use JustinHoltWeb\Peek\Listeners\AddEditorMetadata;
+use JustinHoltWeb\Peek\Listeners\BroadcastDashboardChange;
+use JustinHoltWeb\Peek\Listeners\ForgetChangeCounts;
+use JustinHoltWeb\Peek\Listeners\QueuePublishWebhook;
 use JustinHoltWeb\Peek\Listeners\RemoveDiscardedDraft;
 use JustinHoltWeb\Peek\Listeners\TrackAppliedDraft;
 use JustinHoltWeb\Peek\Mcp\PeekTools;
@@ -46,6 +53,7 @@ use JustinHoltWeb\Peek\Services\Diff;
 use JustinHoltWeb\Peek\Services\PendingDrafts;
 use JustinHoltWeb\Peek\Services\Releases;
 use JustinHoltWeb\Peek\Services\ReleaseSystem;
+use JustinHoltWeb\Peek\Widgets\DraftsWidget;
 use Override;
 use Throwable;
 
@@ -102,6 +110,10 @@ class Plugin extends BasePlugin
         MoveToCraftCommand::class,
     ];
 
+    protected array $widgets = [
+        DraftsWidget::class,
+    ];
+
     protected array $gqlQueries = [
         PeekQueries::class,
     ];
@@ -111,6 +123,10 @@ class Plugin extends BasePlugin
         DraftApplied::class => TrackAppliedDraft::class,
         ElementDeleting::class => RemoveDiscardedDraft::class,
         ElementMetadataResolving::class => AddEditorMetadata::class,
+        ElementSaved::class => [ForgetChangeCounts::class, BroadcastDashboardChange::class],
+        ElementDeleted::class => BroadcastDashboardChange::class,
+        PeekReleasePublished::class => [QueuePublishWebhook::class, BroadcastDashboardChange::class],
+        ReleasePublished::class => QueuePublishWebhook::class,
     ];
 
     #[Override]
@@ -135,6 +151,11 @@ class Plugin extends BasePlugin
 
         // MCP: the tools are on Craft's own server (`php artisan craft:mcp:serve`, or HTTP).
         $capabilities->register(PeekTools::class);
+
+        // The dashboard's private channel, only where the site broadcasts at all.
+        if (BroadcastDashboardChange::enabled()) {
+            require __DIR__.'/../routes/channels.php';
+        }
 
         Event::listen(GqlSchemaComponentsResolving::class, function (GqlSchemaComponentsResolving $event): void {
             $event->queries[t('Peek', category: 'peek')] = [

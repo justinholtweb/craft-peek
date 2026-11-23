@@ -298,3 +298,35 @@
         min-height: 60dvh;
     }
 }
+
+/* Dashboard widget */
+.peek-widget-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+
+.peek-widget-stats a {
+    text-decoration: none;
+}
+
+.peek-widget-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.peek-widget-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--hairline-color, #e3e5e8);
+}
+
+.peek-widget-list .peek-btn {
+    margin-left: auto;
+}

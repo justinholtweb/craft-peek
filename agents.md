@@ -51,7 +51,15 @@ tests/  Pest on PluginTestCase (real Craft 6 + Peek on in-memory SQLite)
    (`$draft->draftId`). `ReleaseSummary::$entries[].draftId` is always the element ID.
 6. **Sidebar = `ElementMetadataResolving`.** Craft 6's Inertia editor has no sidebar-HTML hook.
    Values are closures returning HTML, computed only when drawn; the count re-fetches the saved draft.
-7. **Diff of container fields.** `ElementContainerFieldInterface` (Matrix, Content Block) is serialized
+7. **Integrations (2026-11-23).** MCP (`Mcp/PeekTools`, registered via `CapabilityRegistry` in
+   `boot()`), GraphQL (`Gql/`, scopes `peekDrafts:read`/`peekReleases:read`), CP notifications +
+   mail + Slack on a failed scheduled release (`FailureNotifier`, from the job's `failed()` hook so
+   retries notify once), a signed publish webhook (`QueuePublishWebhook` → `SendPublishWebhook`), a
+   Craft dashboard widget (`Widgets/DraftsWidget`, `craft:html-widget`), a live dashboard
+   (`DashboardChanged` on private `peek.dashboard` when broadcasting is configured, else polling the
+   `peek/dashboard/fragment` JSON), and the nav label/icon. MCP and GraphQL names/shapes are shared
+   with 5.2 (spec in both READMEs). `Support/Presenter` is the one output shape.
+8. **Diff of container fields.** `ElementContainerFieldInterface` (Matrix, Content Block) is serialized
    by content (`#n Type`, title, field values), always queried fresh from the owner with
    `status(null)`, never by nested-entry ID (5.1.2, issue #3).
 
@@ -70,6 +78,14 @@ tests/  Pest on PluginTestCase (real Craft 6 + Peek on in-memory SQLite)
 - **Querying UTC dates:** `BaseModel` converts model attributes, but `->where('scheduledDate', '<=', now())`
   doesn't. Use `Query::prepareDateForDb(now())`.
 - **Install.php is already loaded** once the plugin is installed; `require` it again and PHP fatals.
+- **Change-count cache is keyed by a version, not dates.** Two saves in the same second keep the
+  same `dateUpdated`; `ForgetChangeCounts` bumps `peek:changed-version:{canonicalId}` on every save.
+- **MCP in tests:** `McpActor` reads `request()->user(Cms::config()->authGuard)`. Outside HTTP the
+  request has no user resolver; bind an `McpActor` over a request whose resolver returns the user.
+- **GraphQL in tests:** `app(Gql::class)->executeQuery(new GqlSchema([...]), $query)`. A field not in
+  the schema comes back missing from `data` with no error in this beta.
+- **Every place Peek shows a draft** goes through `PendingDrafts::canView()` (view + editSite on
+  multi-site), per a security review.
 - **Opening an outdated draft in Craft's editor saves it** (canonical changes merged), bumping its
   date. Explains "the draft changed but nobody edited it" (issue #3, 2026-11).
 - **CP JS loads on every page, in `<head>`, before Vue.** Delegate from `document`; Inertia swaps the
@@ -79,7 +95,7 @@ tests/  Pest on PluginTestCase (real Craft 6 + Peek on in-memory SQLite)
 
 ```sh
 # In the Craft 6 harness container (PHP 8.5), from the worktree:
-docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pest      # 65 tests
+docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pest      # 93 tests
 docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pint --test
 docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/phpstan analyse --memory-limit=1G   # level 6
 ~/Sites/plugin-testing-craft6/bin/port-check craft-peek

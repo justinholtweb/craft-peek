@@ -8,8 +8,10 @@ use CraftCms\Cms\Queue\Job;
 use CraftCms\Cms\User\Elements\User;
 use Illuminate\Support\Facades\Log;
 use JustinHoltWeb\Peek\Enums\ReleaseStatus;
+use JustinHoltWeb\Peek\Services\FailureNotifier;
 use JustinHoltWeb\Peek\Services\Releases;
 use RuntimeException;
+use Throwable;
 
 use function CraftCms\Cms\t;
 
@@ -55,6 +57,18 @@ class PublishRelease extends Job
         }
 
         Log::info("Peek published release #{$this->releaseId} “{$release->name}”.");
+    }
+
+    /**
+     * After the last attempt: tell people, once. Each retry would otherwise notify again.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        $release = app(Releases::class)->find($this->releaseId);
+
+        if ($release !== null) {
+            app(FailureNotifier::class)->releaseFailed($release, $exception?->getMessage() ?? 'Unknown error.');
+        }
     }
 
     protected function defaultDescription(): string

@@ -83,3 +83,20 @@ it('lists releases and their readable entries', function () {
     $noSection = gql(['peekReleases:read', 'sites.'.Sites::getPrimarySite()->uid.':read'], "{ peekRelease(id: {$release->id}) { entries { draftId } } }");
     expect($noSection['data']['peekRelease']['entries'])->toBe([]);
 });
+
+it('counts only the entries a schema can read', function () {
+    $release = Release::query()->create(['name' => 'Counted', 'siteId' => Sites::getPrimarySite()->id]);
+    app(Releases::class)->addDraft($release, $this->createDraft($this->createEntry('Counted entry'), ['title' => 'Draft']), null);
+
+    $result = gql(['peekReleases:read', 'sites.'.Sites::getPrimarySite()->uid.':read'], '{ peekReleases { entryCount } }');
+
+    expect($result['data']['peekReleases'])->toBe([['entryCount' => 0]]);
+});
+
+it('hides Peek releases on sites the schema can’t read', function () {
+    Release::query()->create(['name' => 'Other site', 'siteId' => Sites::getPrimarySite()->id]);
+
+    $result = gql(['peekReleases:read'], '{ peekReleases { id } }');
+
+    expect($result['data']['peekReleases'])->toBe([]);
+});

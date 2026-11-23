@@ -17,6 +17,13 @@ release for Craft 5. Upgrading from Craft 5? Read [UPGRADING.md](UPGRADING.md).
   the releases it's in, with *Add to a release…*.
 - **Releases.** Group drafts and publish them all at once, or none of them. Schedule them. Publish
   them from the command line in a deploy.
+- **AI agents (MCP).** Tools on Craft's own MCP server: list drafts, read a draft's diff, list,
+  fill and publish releases, always as the signed-in user.
+- **GraphQL.** `peekDrafts`, `peekDraftDiff`, `peekReleases`, `peekRelease`, behind schema scopes.
+- **Notifications and hooks.** A failed scheduled release lands in the CP's notifications, email and
+  Slack; a published release POSTs a signed webhook (CDN purge, static rebuild, deploy hook).
+- **Craft dashboard widget** and a **live Peek dashboard** (Laravel broadcasting, or polling).
+- **Your own sidebar label and icon.**
 
 ## Releases on each Craft edition
 
@@ -130,6 +137,99 @@ php artisan peek:releases:move-to-craft --as=jane    # Pro and Enterprise
 > publish by accident, `php craft peek/releases/publish 12 -n` (the Craft 5 name) is still a dry run,
 > and says so. Under the new name, `peek:releases:publish 12 -n` publishes. Write `--dry-run`.
 
+## MCP (AI agents)
+
+Peek adds six tools to Craft's MCP server. Turn on Craft's MCP server as Craft's docs describe, or
+run it locally over stdio with `php artisan craft:mcp:serve --user=<username>`.
+
+| Tool | Does | Needs |
+| --- | --- | --- |
+| `peek_drafts_list` | Drafts you can open, newest first; `staleOnly`, `siteId`, `limit`, `offset` | Access Peek |
+| `peek_draft_diff` | One draft compared with its entry, field by field, as text | View diffs |
+| `peek_releases_list` | Releases (`status` filter) | Manage releases (Peek's, or Craft's on Pro) |
+| `peek_release_get` | One release, its drafts, and what would stop it publishing | Manage releases |
+| `peek_release_add_draft` | Adds a draft you could publish yourself | Manage releases |
+| `peek_release_publish` | Publishes now, or `dryRun` | Publish releases |
+
+Every tool acts as the MCP user, with the control panel's checks: an agent sees only the drafts its
+user could open, and publishes only what its user could. `peek_release_publish` never publishes as
+the system. The read-only tools need the token's `mcp:read` scope; adding and publishing need
+`mcp:write`. On Pro and Enterprise, release tools take `source: "peek"|"craft"`.
+
+The same tools, with the same names, are in Peek 5.2 for Craft 5.12.1+.
+
+## GraphQL
+
+Enable under **Settings → GraphQL → Schemas → Peek**:
+
+| Scope | Queries |
+| --- | --- |
+| Query drafts and their diffs | `peekDrafts(siteId, staleOnly, limit, offset)`, `peekDraftDiff(draftId!, siteId, includeUnchanged)` |
+| Query releases | `peekReleases(status)`, `peekRelease(id!, source)` |
+
+```graphql
+{
+  peekDraftDiff(draftId: 1234) {
+    changedCount
+    draft { title draftName stale }
+    fields { handle label oldValue newValue }
+  }
+}
+```
+
+Drafts are unpublished content, so:
+
+- Nothing resolves on the **public** schema, whatever its scopes.
+- The draft queries also need the schema's **Query for element drafts** option.
+- Only entries in sections and sites the schema can read are returned, and a release's entries
+  (and its `entryCount`) are filtered the same way. On Pro and Enterprise, Craft's releases also need
+  the schema's release option.
+- It's read-only: there are no mutations.
+
+## Notifications and the publish webhook
+
+Settings → Plugins → Peek → Releases:
+
+- **Tell people when a scheduled release fails.** One of Peek's scheduled releases that doesn't
+  publish (a draft can't be applied, or its scheduler lost the right to) notifies the person who
+  scheduled it in the CP's notifications and by email, plus any **Also email** addresses and a
+  **Slack webhook URL**. Sent once, after the queue's last attempt. Craft notifies about its own
+  releases.
+- **Publish webhook URL.** When any release publishes, Peek's or Craft's, Peek POSTs this JSON from
+  the queue (retried with backoff):
+
+  ```json
+  {
+    "event": "release.published",
+    "release": {"source": "peek", "id": 12, "name": "Spring launch", "status": "published", "site": "default", "entryCount": 3, "scheduledDate": null, "publishedDate": "2026-11-23T15:00:00+00:00"},
+    "entries": [{"id": 101, "uri": "news/spring", "url": "https://example.com/news/spring"}],
+    "sentAt": "2026-11-23T15:00:01+00:00"
+  }
+  ```
+
+  With a **secret**, the body is signed: `X-Peek-Signature: sha256=<hex HMAC-SHA256 of the raw body>`.
+  Verify it before acting on the request.
+
+URLs, addresses and the secret accept environment variables (`$PEEK_PUBLISH_WEBHOOK`); keep secrets
+in `.env`.
+
+## Dashboards
+
+- **Craft's dashboard:** add the **Drafts waiting** widget: counts of drafts, stale drafts and open
+  releases, and the latest (or stalest) drafts with links to their diffs.
+- **Peek's dashboard refreshes itself.** If the site has Laravel broadcasting set up (Reverb, Pusher
+  or Ably, with `Broadcast::routes()` and Laravel Echo on CP pages as `window.Echo`), it updates the
+  moment a draft is saved or a release publishes, on the private `peek.dashboard` channel. Otherwise
+  it refetches every **Dashboard refresh** seconds (60 by default; 0 turns it off) while the tab is
+  visible. Either way it fetches its own content, so it only ever shows what the viewer may see.
+- The draft sidebar's *Fields changed* count is cached until the draft or its entry is saved again.
+
+## Sidebar label and icon
+
+Settings → Plugins → Peek → Control panel: a **Sidebar label**, a **Sidebar icon** from Craft's icon
+picker, or a **Custom SVG icon** (sanitised each time it's drawn). An override made in Craft's
+Settings → Control Panel Navigation still wins.
+
 ## Permissions
 
 | Permission | What it allows |
@@ -167,6 +267,15 @@ return [
     'defaultSiteId' => null,         // the site new Peek releases start on (null: primary)
     'enableVisualPreview' => true,   // the Visual preview tab
     'maxEntriesPerRelease' => 50,    // the most drafts one of Peek's releases can hold
+    'navLabel' => null,              // sidebar label (null: "Peek")
+    'navIcon' => null,               // an icon name from Craft's icon picker
+    'navIconSvg' => null,            // or raw SVG, which wins
+    'notifyOnFailure' => true,       // tell people when a scheduled release fails
+    'failureEmails' => '$PEEK_FAILURE_EMAILS',
+    'failureSlackWebhookUrl' => '$PEEK_SLACK_WEBHOOK',
+    'publishWebhookUrl' => '$PEEK_PUBLISH_WEBHOOK',
+    'publishWebhookSecret' => '$PEEK_WEBHOOK_SECRET',
+    'dashboardRefreshSeconds' => 60, // without broadcasting; 0 turns it off
 ];
 ```
 

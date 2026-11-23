@@ -81,3 +81,76 @@
         }
     }, true);
 })();
+
+/*
+ * Peek's dashboard keeps itself current. With Laravel Echo on the page and broadcasting set up, it
+ * listens on the private `peek.dashboard` channel; otherwise it refetches every `data-refresh`
+ * seconds while the tab is visible. Either way it asks the server for its own content, so what it
+ * shows is always filtered by the viewer's permissions.
+ */
+(() => {
+    'use strict';
+
+    let timer = null;
+    let channel = null;
+
+    const root = () => document.querySelector('[data-peek-dashboard]');
+
+    const refresh = async () => {
+        const el = root();
+        if (!el || document.hidden) {
+            return;
+        }
+
+        try {
+            const response = await fetch(el.dataset.fragmentUrl, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (response.ok) {
+                const { html } = await response.json();
+                el.innerHTML = html;
+            }
+        } catch (e) {
+            // Offline or signed out: try again next time.
+        }
+    };
+
+    const stop = () => {
+        clearInterval(timer);
+        timer = null;
+        if (channel && window.Echo) {
+            window.Echo.leave('peek.dashboard');
+            channel = null;
+        }
+    };
+
+    const start = () => {
+        stop();
+        const el = root();
+        if (!el) {
+            return;
+        }
+
+        if (el.dataset.live === '1' && window.Echo && typeof window.Echo.private === 'function') {
+            channel = window.Echo.private('peek.dashboard').listen('.peek.dashboard.changed', refresh);
+            return;
+        }
+
+        const seconds = parseInt(el.dataset.refresh || '0', 10);
+        if (seconds > 0) {
+            timer = setInterval(refresh, seconds * 1000);
+        }
+    };
+
+    // The script runs before Vue renders the screen, and screens change by Inertia visits.
+    document.addEventListener('inertia:navigate', () => setTimeout(start, 0));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && root()) { refresh(); } });
+    let tries = 0;
+    const wait = setInterval(() => {
+        if (root() || ++tries > 20) {
+            clearInterval(wait);
+            start();
+        }
+    }, 250);
+})();

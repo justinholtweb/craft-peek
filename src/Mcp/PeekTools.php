@@ -60,6 +60,11 @@ class PeekTools
         int $offset = 0,
     ): array {
         $user = $this->user();
+
+        if ($siteId !== null && Sites::isMultiSite() && ! $user->can('editSite:'.Sites::getSiteById($siteId, true)?->uid)) {
+            return ['total' => 0, 'drafts' => []];
+        }
+
         $drafts = $staleOnly
             ? $this->drafts->stale($this->settings->staleDraftDays, $siteId, $user)
             : $this->drafts->all($siteId, $user);
@@ -98,8 +103,7 @@ class PeekTools
 
         // One message for "missing" and "not yours", so the tool isn't an existence oracle.
         if (! $draft instanceof Entry || ! $canonical instanceof Entry || $canonical->id === $draft->id
-            || ! $user->can('view', $draft) || ! $user->can('view', $canonical)
-            || (Sites::isMultiSite() && ! $user->can('editSite:'.$draft->getSite()->uid))) {
+            || ! PendingDrafts::canView($draft, $user) || ! $user->can('view', $canonical)) {
             throw new ToolCallException("Draft {$draftId} not found.");
         }
 
@@ -180,7 +184,7 @@ class PeekTools
 
         $draft = $this->peekReleases->draft($draftId);
 
-        if ($draft === null || ! $user->can('view', $draft)) {
+        if ($draft === null || ! PendingDrafts::canView($draft, $user)) {
             throw new ToolCallException("Draft {$draftId} not found.");
         }
 
@@ -280,7 +284,7 @@ class PeekTools
             $subject ??= Entry::find()->id($entry['canonicalId'])->status(null)->site('*')->one();
 
             return $entry + [
-                'title' => $subject instanceof Entry && $user->can('view', $subject) ? $subject->title : null,
+                'title' => $subject instanceof Entry && PendingDrafts::canView($subject, $user) ? $subject->title : null,
             ];
         }, $release->entries);
 

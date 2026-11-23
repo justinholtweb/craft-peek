@@ -23,6 +23,7 @@ use CraftCms\Cms\Support\Url;
 use DateTimeInterface;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -110,6 +111,31 @@ class Diff
     public function changedCount(Entry $draft, Entry $canonical): int
     {
         return count(array_filter($this->diffEntry($draft, $canonical), fn (FieldDiff $diff) => $diff->hasChanges));
+    }
+
+    /**
+     * {@see changedCount()}, cached until the draft or its entry is saved again: the editor sidebar
+     * asks every time a draft is opened, and diffing a long Matrix entry isn't cheap.
+     */
+    public function cachedChangedCount(Entry $draft, Entry $canonical): int
+    {
+        $key = sprintf('peek:changed:%d:%d:%d', $draft->id, $draft->siteId, self::version((int) $canonical->id));
+
+        return (int) Cache::remember($key, now()->addDay(), fn () => $this->changedCount($draft, $canonical));
+    }
+
+    /**
+     * Bumped whenever an entry or any of its drafts is saved (see `ForgetChangeCounts`). Dates
+     * alone weren't enough: two saves in the same second keep the same `dateUpdated`.
+     */
+    public static function version(int $canonicalId): int
+    {
+        return (int) Cache::get("peek:changed-version:{$canonicalId}", 0);
+    }
+
+    public static function bumpVersion(int $canonicalId): void
+    {
+        Cache::forever("peek:changed-version:{$canonicalId}", self::version($canonicalId) + 1);
     }
 
     /**

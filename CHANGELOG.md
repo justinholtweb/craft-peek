@@ -19,6 +19,20 @@ Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-peek/b
 - The scheduler check is registered on Laravel's scheduler, every minute, so a site running
   `php artisan schedule:run` needs no cron line of Peek's own.
 - `JustinHoltWeb\Peek\Events\PeekReleasePublished`, after one of Peek's releases publishes.
+- MCP tools on Craft's MCP server: `peek_drafts_list`, `peek_draft_diff`, `peek_releases_list`,
+  `peek_release_get`, `peek_release_add_draft` and `peek_release_publish`, acting as the MCP user.
+- GraphQL: `peekDrafts`, `peekDraftDiff`, `peekReleases` and `peekRelease`, behind a *Peek* schema
+  component. Read-only; never on the public schema; draft queries also need *Query for element
+  drafts*; only entries in sections and sites the schema can read.
+- A failed scheduled release notifies its scheduler in the CP's notifications and by email, plus
+  extra addresses and a Slack webhook (*Tell people when a scheduled release fails*).
+- A publish webhook: a signed JSON POST, from the queue, whenever a release publishes (Peek's or
+  Craft's), with the live URLs of the entries it changed.
+- A *Drafts waiting* widget for Craft's dashboard.
+- Peek's dashboard updates live over Laravel broadcasting where the site has it, and otherwise
+  refreshes itself every *Dashboard refresh* seconds.
+- *Sidebar label*, *Sidebar icon* and *Custom SVG icon* settings.
+- The sidebar's *Fields changed* count is cached until the draft or its entry is saved again.
 
 ### Changed
 

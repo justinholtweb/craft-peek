@@ -55,7 +55,7 @@ readonly class AddEditorMetadata
                     $canonical = $saved->getCanonical();
 
                     return $canonical instanceof Entry && $canonical->id !== $saved->id
-                        ? Html::encode((string) $this->diff->changedCount($saved, $canonical))
+                        ? Html::encode((string) $this->diff->cachedChangedCount($saved, $canonical))
                         : false;
                 } catch (Throwable) {
                     return false;

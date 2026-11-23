@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JustinHoltWeb\Peek\Services;
 
 use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Query;
 use CraftCms\Cms\User\Contracts\CraftUser;
 use DateTimeImmutable;
@@ -112,7 +113,20 @@ class PendingDrafts
                 return false;
             }
 
-            return $viewer === null || $viewer->can('view', $draft);
+            return $viewer === null || self::canView($draft, $viewer);
         }));
+    }
+
+    /**
+     * What Craft's editor needs to open a draft: the right to view it and, on a multi-site install,
+     * to edit its site. Every place Peek shows someone a draft goes through this.
+     */
+    public static function canView(Entry $entry, CraftUser $user): bool
+    {
+        if (! $user->can('view', $entry)) {
+            return false;
+        }
+
+        return ! Sites::isMultiSite() || $user->can('editSite:'.$entry->getSite()->uid);
     }
 }
