@@ -1,5 +1,45 @@
 # Changelog
 
+## 6.0.0-beta.1 - 2026-11-23
+
+Peek for Craft CMS 6, rebuilt as a native Craft 6 plugin. It runs on Laravel and has no dependency on
+the Yii 2 adapter. Craft 6 is in beta, and so is this release. Update to Peek 5.1.2 before upgrading
+Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-peek/blob/6.0.0/UPGRADING.md).
+
+### Added
+
+- On Craft 6 Pro and Enterprise, which have releases of their own, Peek works with Craft's releases:
+  the draft sidebar adds drafts to them, the dashboard counts them, and the `peek:releases:*`
+  commands list, check and publish them (`--source=peek|craft`, `list --all`). Solo and Team keep
+  Peek's own releases. One release system per site, so two never apply the same drafts.
+- `peek:releases:move-to-craft` moves Peek's unpublished releases into Craft's on Pro and Enterprise,
+  with their drafts and schedules. Until then they're under **Peek → Earlier releases**.
+- *Compare in Craft* on the diff screen opens Craft 6's own Compare screen for the same draft.
+- Content Block fields are compared by what's in them, like Matrix.
+- The scheduler check is registered on Laravel's scheduler, every minute, so a site running
+  `php artisan schedule:run` needs no cron line of Peek's own.
+- `JustinHoltWeb\Peek\Events\PeekReleasePublished`, after one of Peek's releases publishes.
+
+### Changed
+
+- Requires Craft CMS 6 and PHP 8.5.
+- Console commands are Artisan commands: `peek:releases:list`, `peek:releases:status`,
+  `peek:releases:publish` and `peek:scheduler:check`. The Craft 5 names still work through `php craft`.
+- **`-n` is `--no-interaction`, Laravel's meaning, instead of `--dry-run`.** Under the Craft 5 name
+  (`php craft peek/releases/publish 12 -n`) it's still a dry run, with a warning, so a 5.x script
+  that checked a release doesn't publish it. Use `--dry-run`.
+- A missing release or an invalid option exits `2` (was `65`).
+- The draft sidebar's rows sit with the draft's details in Craft 6's editor, which has no hook for
+  free sidebar HTML. *Add to a release…* opens a small screen to choose the release.
+- The release screens, settings and tables use Craft 6's control panel components.
+- The config file is `config/craft/peek.php` (was `config/peek.php`); the keys are the same.
+- `publish()` returns the reasons a release wasn't published (empty when it was), instead of a
+  boolean with errors on the model.
+
+### Removed
+
+- Categories fields: Craft 6 has no categories.
+
 ## 5.1.2 - 2026-11-23
 
 ### Security

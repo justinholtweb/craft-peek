@@ -8,6 +8,7 @@ Peek is a content staging and visual diff plugin for Craft CMS 5. Single paid ed
 **Craft CMS:** ^5.0.0 | **PHP:** ^8.2
 **Dependencies:** `jfcherng/php-diff` ^6.0
 **Pattern source:** `/Users/jholt/Sites/craft-garrison/` (Plugin.php, Migration, Enum, Record patterns)
+**Craft 6:** the `6.0.0` branch (6.0.0-beta.1), a worktree at `~/Sites/craft6-ports/craft-peek` with its own `agents.md`. Fixes for both go here first. The changelog is shared: both branches list both release lines.
 
 ---
 
