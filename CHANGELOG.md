@@ -33,6 +33,8 @@ Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-peek/b
   refreshes itself every *Dashboard refresh* seconds.
 - *Sidebar label*, *Sidebar icon* and *Custom SVG icon* settings.
 - The sidebar's *Fields changed* count is cached until the draft or its entry is saved again.
+- Over GraphQL, related elements in a diff (relation fields, including inside Matrix blocks) are
+  shown only as a count, so a schema never sees elements outside its scopes.
 
 ### Changed
 

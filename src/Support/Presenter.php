@@ -42,7 +42,7 @@ final class Presenter
             'canonicalId' => (int) $draft->getCanonicalId(),
             'title' => $draft->title !== null ? (string) $draft->title : null,
             'draftName' => $draft->draftName,
-            'section' => $section !== null ? $section->name : null,
+            'section' => $section?->handle,
             'sectionHandle' => $section?->handle,
             'site' => $draft->getSite()->handle,
             'creator' => $creator,

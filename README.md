@@ -184,6 +184,8 @@ Drafts are unpublished content, so:
 - Only entries in sections and sites the schema can read are returned, and a release's entries
   (and its `entryCount`) are filtered the same way. On Pro and Enterprise, Craft's releases also need
   the schema's release option.
+- Related elements in a diff (relation fields, also inside Matrix) are shown only as a count, such
+  as `1 related element`: they may be outside the schema's scopes. `changed` still reflects them.
 - It's read-only: there are no mutations.
 
 ## Notifications and the publish webhook

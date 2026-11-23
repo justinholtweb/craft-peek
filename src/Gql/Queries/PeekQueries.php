@@ -153,7 +153,8 @@ final class PeekQueries extends Query
             return null;
         }
 
-        $diffs = app(Diff::class)->diffEntry($draft, $canonical);
+        // Related elements may be outside the schema's scopes: shown as counts only.
+        $diffs = app(Diff::class)->diffEntry($draft, $canonical, redactRelations: true);
         $changed = array_values(array_filter($diffs, fn (FieldDiff $d) => $d->hasChanges));
 
         return [

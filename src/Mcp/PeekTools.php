@@ -48,6 +48,7 @@ class PeekTools
         description: 'Lists saved drafts of entries that you can open, most recently saved first, with whether each is stale (no save within Peek’s threshold). Provisional drafts (unsaved edits) are never included.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
+    #[RequiresPermission('accessCp')]
     #[RequiresPermission(Plugin::PERMISSION_ACCESS)]
     public function listDrafts(
         #[Schema(description: 'Only drafts with no save within Peek’s stale-draft threshold.')]
@@ -86,6 +87,7 @@ class PeekTools
         description: 'Compares a draft with its live entry, field by field, as text: what each changed field was and what it will be. Matrix and Content Block fields are spelled out block by block.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
+    #[RequiresPermission('accessCp')]
     #[RequiresPermission(Plugin::PERMISSION_ACCESS)]
     #[RequiresPermission(Plugin::PERMISSION_VIEW_DIFFS)]
     public function diffDraft(
@@ -104,7 +106,7 @@ class PeekTools
         // One message for "missing" and "not yours", so the tool isn't an existence oracle.
         if (! $draft instanceof Entry || ! $canonical instanceof Entry || $canonical->id === $draft->id
             || ! PendingDrafts::canView($draft, $user) || ! $user->can('view', $canonical)) {
-            throw new ToolCallException("Draft {$draftId} not found.");
+            throw new ToolCallException('Draft not found.');
         }
 
         $diffs = $this->diff->diffEntry($draft, $canonical);
@@ -125,6 +127,7 @@ class PeekTools
         description: 'Lists releases, newest first. On Craft Pro and Enterprise these are Craft’s own releases plus any of Peek’s not yet finished; on Solo and Team, Peek’s.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
+    #[RequiresPermission('accessCp')]
     #[RequiresPermission(Plugin::PERMISSION_ACCESS)]
     public function listReleases(
         #[Schema(description: 'Only releases in this status (draft, ready, scheduled, publishing, published, failed).')]
@@ -152,6 +155,7 @@ class PeekTools
         description: 'One release with its drafts and anything that would stop you publishing it. Titles are given only for drafts you can view.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
+    #[RequiresPermission('accessCp')]
     #[RequiresPermission(Plugin::PERMISSION_ACCESS)]
     public function getRelease(
         #[Schema(minimum: 1)]
@@ -171,6 +175,7 @@ class PeekTools
         name: 'peek_release_add_draft',
         description: 'Adds a saved draft to a release. You must be able to publish the draft yourself (save it and its entry).',
     )]
+    #[RequiresPermission('accessCp')]
     #[RequiresPermission(Plugin::PERMISSION_ACCESS)]
     public function addDraft(
         #[Schema(minimum: 1)]
@@ -185,7 +190,7 @@ class PeekTools
         $draft = $this->peekReleases->draft($draftId);
 
         if ($draft === null || ! PendingDrafts::canView($draft, $user)) {
-            throw new ToolCallException("Draft {$draftId} not found.");
+            throw new ToolCallException('Draft not found.');
         }
 
         if (($error = $this->releases->addDraft($source, $releaseId, $draft, $user)) !== null) {
@@ -202,6 +207,7 @@ class PeekTools
         name: 'peek_release_publish',
         description: 'Publishes a release now, as you: every draft is applied, or none is. With dryRun, only reports what would stop it.',
     )]
+    #[RequiresPermission('accessCp')]
     #[RequiresPermission(Plugin::PERMISSION_ACCESS)]
     public function publishRelease(
         #[Schema(minimum: 1)]
@@ -233,7 +239,7 @@ class PeekTools
             'published' => ! $dryRun && $problems === [],
             'dryRun' => $dryRun,
             'problems' => $problems,
-            'release' => $this->present($after, $user, withProblems: false),
+            'release' => $this->present($after, $user),
         ];
     }
 
@@ -268,7 +274,7 @@ class PeekTools
         $release = $this->releases->find($source, $releaseId, withEntries: true);
 
         if ($release === null) {
-            throw new ToolCallException("Release {$releaseId} not found.");
+            throw new ToolCallException('Release not found.');
         }
 
         return [$user, $source, $release];
@@ -288,9 +294,9 @@ class PeekTools
             ];
         }, $release->entries);
 
-        $problems = $withProblems && $release->status !== 'published'
-            ? $this->releases->problems($release->source, $release->id, $user)
-            : null;
+        $problems = ! $withProblems ? null : ($release->status === 'published'
+            ? []
+            : $this->releases->problems($release->source, $release->id, $user));
 
         return Presenter::release($release, $entries, $problems);
     }

@@ -7,6 +7,7 @@ namespace JustinHoltWeb\Peek\Tests\Support;
 use CraftCms\Cms\Edition;
 use CraftCms\Cms\Entry\Data\EntryType;
 use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Field\Entries;
 use CraftCms\Cms\Field\Matrix;
 use CraftCms\Cms\Field\PlainText;
 use CraftCms\Cms\FieldLayout\FieldLayout;
@@ -48,9 +49,12 @@ trait CreatesContent
         $heading = new PlainText(['name' => 'Section Heading', 'handle' => 'heading']);
         expect(Fields::saveField($heading))->toBeTrue();
 
+        $related = new Entries(['name' => 'Related', 'handle' => 'related']);
+        expect(Fields::saveField($related))->toBeTrue();
+
         $blockType = new EntryType(['name' => 'Text Grid', 'handle' => 'textGrid']);
         $blockLayout = new FieldLayout(['type' => Entry::class]);
-        $blockLayout->setTabs([['name' => 'Content', 'elements' => [new CustomField($heading)]]]);
+        $blockLayout->setTabs([['name' => 'Content', 'elements' => [new CustomField($heading), new CustomField($related)]]]);
         $blockType->setFieldLayout($blockLayout);
         expect(EntryTypes::saveEntryType($blockType))->toBeTrue();
 
@@ -61,7 +65,7 @@ trait CreatesContent
         $layout = new FieldLayout(['type' => Entry::class]);
         $layout->setTabs([[
             'name' => 'Content',
-            'elements' => [new EntryTitleField, new CustomField($body), new CustomField($blocks)],
+            'elements' => [new EntryTitleField, new CustomField($body), new CustomField($blocks), new CustomField($related)],
         ]]);
 
         $this->entryType = new EntryType(['name' => 'Article', 'handle' => 'article']);

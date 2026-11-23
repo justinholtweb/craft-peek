@@ -47,6 +47,15 @@ class Diff
     /** How deep nested entries (Matrix in Matrix…) are spelled out before falling back to IDs. */
     private const int MAX_DEPTH = 4;
 
+    /**
+     * Set for GraphQL: a schema can't be shown elements outside its scopes, so related elements are
+     * shown only as a count. Whether a field changed is still decided on the full values.
+     */
+    private bool $redactRelations = false;
+
+    /** Serializing for display rather than for comparison. */
+    private bool $displaying = false;
+
     public function __construct(
         private readonly RouteTokens $tokens,
     ) {}
@@ -54,7 +63,21 @@ class Diff
     /**
      * @return list<FieldDiff>
      */
-    public function diffEntry(Entry $draft, Entry $canonical): array
+    public function diffEntry(Entry $draft, Entry $canonical, bool $redactRelations = false): array
+    {
+        $this->redactRelations = $redactRelations;
+
+        try {
+            return $this->diffEntryInternal($draft, $canonical);
+        } finally {
+            $this->redactRelations = false;
+        }
+    }
+
+    /**
+     * @return list<FieldDiff>
+     */
+    private function diffEntryInternal(Entry $draft, Entry $canonical): array
     {
         $diffs = [];
 
@@ -192,6 +215,17 @@ class Diff
         $old = $this->valueToString($field, $canonical->getFieldValue($handle), $canonical);
         $new = $this->valueToString($field, $draft->getFieldValue($handle), $draft);
         $changed = $old !== $new;
+
+        if ($this->redactRelations) {
+            $this->displaying = true;
+
+            try {
+                $old = $this->valueToString($field, $canonical->getFieldValue($handle), $canonical);
+                $new = $this->valueToString($field, $draft->getFieldValue($handle), $draft);
+            } finally {
+                $this->displaying = false;
+            }
+        }
 
         $html = null;
         if ($changed) {
@@ -368,6 +402,10 @@ class Diff
             return '(none)';
         }
 
+        if ($this->redactRelations && $this->displaying) {
+            return count($elements) === 1 ? '1 related element' : count($elements).' related elements';
+        }
+
         return implode("\n", array_map(
             fn (ElementInterface $el) => trim(((string) ($el->title ?? '')).' (#'.$el->id.')'),
             $elements,
@@ -384,6 +422,10 @@ class Diff
 
         if ($elements === []) {
             return '(none)';
+        }
+
+        if ($this->redactRelations && $this->displaying) {
+            return count($elements) === 1 ? '1 related element' : count($elements).' related elements';
         }
 
         return implode("\n", array_map(

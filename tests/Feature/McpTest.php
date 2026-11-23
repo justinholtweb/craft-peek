@@ -59,8 +59,8 @@ it('won’t diff a draft the user can’t view, and doesn’t say whether it exi
     $draft = $this->createDraft($this->createEntry('Secret'), ['title' => 'Secret draft']);
     actAs($this, $this->userWith(['peek:accessPlugin', 'peek:viewDiffs']));
 
-    expect(fn () => tools()->diffDraft($draft->id))->toThrow(ToolCallException::class, "Draft {$draft->id} not found.");
-    expect(fn () => tools()->diffDraft(999999))->toThrow(ToolCallException::class, 'Draft 999999 not found.');
+    expect(fn () => tools()->diffDraft($draft->id))->toThrow(ToolCallException::class, 'Draft not found.');
+    expect(fn () => tools()->diffDraft(999999))->toThrow(ToolCallException::class, 'Draft not found.');
 });
 
 it('adds a draft and publishes the release as the user', function () {

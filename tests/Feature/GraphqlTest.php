@@ -6,6 +6,7 @@ use CraftCms\Cms\Gql\Data\GqlSchema;
 use CraftCms\Cms\Gql\Gql;
 use CraftCms\Cms\Support\Facades\Sites;
 use JustinHoltWeb\Peek\Models\Release;
+use JustinHoltWeb\Peek\Services\Diff;
 use JustinHoltWeb\Peek\Services\Releases;
 
 function gql(array $scope, string $query, bool $public = false): array
@@ -99,4 +100,26 @@ it('hides Peek releases on sites the schema can’t read', function () {
     $result = gql(['peekReleases:read'], '{ peekReleases { id } }');
 
     expect($result['data']['peekReleases'])->toBe([]);
+});
+
+it('shows related elements in a diff only as a count', function () {
+    $secret = $this->createEntry('Top secret target');
+    $canonical = $this->createEntry('Relates');
+    $draft = $this->createDraft($canonical, [], [
+        'related' => [$secret->id],
+        'blocks' => ['new1' => ['type' => 'textGrid', 'enabled' => true, 'fields' => ['heading' => 'H', 'related' => [$secret->id]]]],
+    ]);
+
+    $result = gql(fullScope($this->section()->uid), "{ peekDraftDiff(draftId: {$draft->id}) { fields { handle changed oldValue newValue } } }");
+    $fields = collect($result['data']['peekDraftDiff']['fields'])->keyBy('handle');
+    $json = json_encode($result);
+
+    expect($fields['related'])->toMatchArray(['changed' => true, 'oldValue' => '(none)', 'newValue' => '1 related element'])
+        ->and($fields['blocks']['newValue'])->toContain('Related: 1 related element')
+        ->and($json)->not->toContain('Top secret target')
+        ->and($json)->not->toContain('#'.$secret->id);
+
+    // The CP still names them.
+    $cp = collect(app(Diff::class)->diffEntry($draft, $canonical))->keyBy('handle');
+    expect($cp['related']->newValue)->toContain('Top secret target');
 });
