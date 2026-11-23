@@ -152,5 +152,24 @@ it('redacts anything holding elements, and objects it can’t see into', functio
             }
         }))->toBe('(not shown over GraphQL)')
         ->and($redact([['col1' => 'plain']]))->toContain('plain')
-        ->and($redact('just text'))->toBe('just text');
+        ->and($redact('just text'))->toBe('just text')
+        ->and($redact(new class implements Stringable
+        {
+            public function getRawContent(): string
+            {
+                return '<p>Hi <a href="{entry:1@1:url}">x</a></p>';
+            }
+
+            public function __toString(): string
+            {
+                return 'RENDERED SECRET';
+            }
+        }))->toBe('Hi x')
+        ->and($redact(new class implements Stringable
+        {
+            public function __toString(): string
+            {
+                return 'opaque';
+            }
+        }))->toBe('(not shown over GraphQL)');
 });

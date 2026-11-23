@@ -276,7 +276,13 @@ class Diff
                 }
             } elseif (($elements = self::countElements($value)) > 0) {
                 return $elements === 1 ? '1 related element' : $elements.' related elements';
-            } elseif (is_object($value) && ! $value instanceof DateTimeInterface && ! $value instanceof Stringable && ! $value instanceof ElementQueryInterface) {
+            } elseif ($value instanceof Stringable && method_exists($value, 'getRawContent')) {
+                // Rich text (CKEditor): the stored HTML, never rendered. Rendering parses reference
+                // tags and nested entries, which can pull in other elements.
+                $raw = preg_replace('/\{[a-z][a-z0-9_-]*:[^}]*\}/i', '', (string) $value->getRawContent()) ?? '';
+
+                return trim(strip_tags($raw));
+            } elseif (is_object($value) && ! $value instanceof DateTimeInterface && ! $value instanceof ElementQueryInterface) {
                 return '(not shown over GraphQL)';
             }
         }

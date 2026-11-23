@@ -149,11 +149,12 @@ run it locally over stdio with `php artisan craft:mcp:serve --user=<username>`.
 | `peek_releases_list` | Releases (`status` filter) | Manage releases (Peek's, or Craft's on Pro) |
 | `peek_release_get` | One release, its drafts, and what would stop it publishing | Manage releases |
 | `peek_release_add_draft` | Adds a draft you could publish yourself | Manage releases |
-| `peek_release_publish` | Publishes now, or `dryRun` | Publish releases |
+| `peek_release_publish` | Publishes now, or `dryRun` | Manage releases + Publish releases |
 
 Every tool acts as the MCP user, with the control panel's checks: an agent sees only the drafts its
-user could open, and publishes only what its user could. `peek_release_publish` never publishes as
-the system. The read-only tools need the token's `mcp:read` scope; adding and publishing need
+user could open (a draft's title only if they could open it), and publishes only what its user
+could. Every tool also needs control panel access. `peek_release_publish` never publishes as the
+system. The read-only tools need the token's `mcp:read` scope; adding and publishing need
 `mcp:write`. On Pro and Enterprise, release tools take `source: "peek"|"craft"`.
 
 The same tools, with the same names, are in Peek 5.2 for Craft 5.12.1+.
@@ -187,7 +188,8 @@ Drafts are unpublished content, so:
 - Related elements in a diff (relation fields, also inside Matrix) are shown only as a count, such
   as `1 related element`: they may be outside the schema's scopes. Links to an element show as
   `1 linked element`, and third-party field values Peek can't see into as `(not shown over
-  GraphQL)`. `changed` still reflects all of them.
+  GraphQL)`. Rich text is read from its stored HTML, never rendered, so reference tags and nested
+  entries aren't resolved. `changed` still reflects all of them.
 - It's read-only: there are no mutations.
 
 ## Notifications and the publish webhook
@@ -230,8 +232,9 @@ in `.env`.
 
 ## Sidebar label and icon
 
-Settings → Plugins → Peek → Control panel: a **Sidebar label**, a **Sidebar icon** from Craft's icon
-picker, or a **Custom SVG icon** (sanitised each time it's drawn). An override made in Craft's
+Settings → Plugins → Peek → Control panel: a **Sidebar label** (up to 64 characters), a **Sidebar
+icon** from Craft's icon picker, or a **Custom SVG icon** (one `<svg>`, up to 20 KB, sanitised each
+time it's drawn). An override made in Craft's
 Settings → Control Panel Navigation still wins.
 
 ## Permissions
