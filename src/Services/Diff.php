@@ -14,6 +14,8 @@ use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
 use CraftCms\Cms\Field\Contracts\FieldInterface;
 use CraftCms\Cms\Field\Contracts\RelationalFieldInterface;
 use CraftCms\Cms\Field\Data\LinkData;
+use CraftCms\Cms\Field\Data\MultiOptionsFieldData;
+use CraftCms\Cms\Field\Data\OptionData;
 use CraftCms\Cms\Field\Date as DateField;
 use CraftCms\Cms\Field\Email as EmailField;
 use CraftCms\Cms\Field\Lightswitch as LightswitchField;
@@ -270,6 +272,15 @@ class Diff
         // Over GraphQL, deny by default: anything that is, holds or links to an element is shown
         // only as a count, and an object we can't see into isn't shown at all.
         if ($this->redactRelations && $this->displaying) {
+            // Dropdowns, radios, checkboxes, multi-selects: plain values, never elements.
+            if ($value instanceof OptionData) {
+                return (string) $value->value;
+            }
+
+            if ($value instanceof MultiOptionsFieldData) {
+                return implode("\n", array_map(fn (OptionData $option) => (string) $option->value, $value->getArrayCopy()));
+            }
+
             if ($value instanceof LinkData) {
                 if ($value->getElement() !== null) {
                     return '1 linked element';

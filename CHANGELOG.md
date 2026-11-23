@@ -35,7 +35,8 @@ Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-peek/b
 - The sidebar's *Fields changed* count is cached until the draft or its entry is saved again.
 - Over GraphQL, related elements in a diff (relation fields, including inside Matrix blocks) are
   shown only as a count, so a schema never sees elements outside its scopes. Element links show as
-  `1 linked element`, and third-party values Peek can't see into as `(not shown over GraphQL)`.
+  `1 linked element`, and third-party values Peek can't see into as `(not shown over GraphQL)`;
+  option fields show their values, and arrays are shown only when they hold plain data.
 
 ### Changed
 

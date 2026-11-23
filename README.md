@@ -188,7 +188,7 @@ Drafts are unpublished content, so:
 - Related elements in a diff (relation fields, also inside Matrix) are shown only as a count, such
   as `1 related element`: they may be outside the schema's scopes. Links to an element show as
   `1 linked element`, and third-party field values Peek can't see into as `(not shown over
-  GraphQL)`. Rich text is read from its stored HTML, never rendered, so reference tags and nested
+  GraphQL)`. Option fields (dropdowns, checkboxes and the like) show their values. Rich text is read from its stored HTML, never rendered, so reference tags and nested
   entries aren't resolved. `changed` still reflects all of them.
 - It's read-only: there are no mutations.
 

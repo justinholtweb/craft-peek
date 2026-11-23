@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use CraftCms\Cms\Field\Data\MultiOptionsFieldData;
+use CraftCms\Cms\Field\Data\OptionData;
+use CraftCms\Cms\Field\Data\SingleOptionFieldData;
 use CraftCms\Cms\Field\PlainText;
 use CraftCms\Cms\Gql\Data\GqlSchema;
 use CraftCms\Cms\Gql\Gql;
@@ -161,6 +164,8 @@ it('redacts anything holding elements, and objects it can’t see into', functio
             }
         }]]))->toBe('(not shown over GraphQL)')
         ->and($redact('just text'))->toBe('just text')
+        ->and($redact(new SingleOptionFieldData('Blue', 'blue', true)))->toBe('blue')
+        ->and($redact(new MultiOptionsFieldData([new OptionData('A', 'a', true), new OptionData('B', 'b', true)])))->toBe("a\nb")
         ->and($redact(new class implements Stringable
         {
             public function getRawContent(): string
