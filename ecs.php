@@ -9,6 +9,7 @@ return static function(ECSConfig $ecsConfig): void {
         __DIR__ . '/tests/unit',
         __DIR__ . '/tests/integration',
         __DIR__ . '/tests/_support',
+        __DIR__ . '/tests/_stubs',
         __FILE__,
     ]);
 

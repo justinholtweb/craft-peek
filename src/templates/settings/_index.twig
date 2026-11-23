@@ -15,6 +15,43 @@
     {% endif %}
 
     <div id="fields">
+        <h2>{{ 'Navigation'|t('peek') }}</h2>
+
+        {{ forms.textField({
+            label: 'Sidebar label'|t('peek'),
+            instructions: 'The name of the Peek item in the control panel sidebar. Leave blank to use “Peek”.'|t('peek'),
+            id: 'navLabel',
+            name: 'navLabel',
+            value: settings.navLabel,
+            placeholder: 'Peek',
+            maxlength: 64,
+            errors: settings.getErrors('navLabel'),
+        }) }}
+
+        {{ forms.iconPickerField({
+            label: 'Sidebar icon'|t('peek'),
+            instructions: 'An icon from Craft’s icon set.'|t('peek'),
+            id: 'navIcon',
+            name: 'navIcon',
+            value: settings.navIcon,
+            errors: settings.getErrors('navIcon'),
+        }) }}
+
+        {{ forms.textareaField({
+            label: 'Custom sidebar icon (SVG)'|t('peek'),
+            instructions: 'Paste a single `<svg>` element to use instead of the icon above. It is sanitized before it is shown: scripts, event handlers and external references are removed.'|t('peek'),
+            id: 'navIconSvg',
+            name: 'navIconSvg',
+            value: settings.navIconSvg,
+            class: 'code',
+            rows: 4,
+            errors: settings.getErrors('navIconSvg'),
+        }) }}
+
+        <p class="light smalltext">{{ 'A control panel navigation plugin, or Craft’s own navigation editor where it has one, overrides these.'|t('peek') }}</p>
+
+        <hr>
+
         <h2>{{ 'General'|t('peek') }}</h2>
 
         {{ forms.textField({
@@ -25,6 +62,7 @@
             value: settings.staleDraftDays,
             type: 'number',
             min: 1,
+            errors: settings.getErrors('staleDraftDays'),
         }) }}
 
         {{ forms.lightswitchField({

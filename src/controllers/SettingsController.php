@@ -51,8 +51,14 @@ class SettingsController extends Controller
         $settings->enableVisualPreview = (bool)Craft::$app->getRequest()->getBodyParam('enableVisualPreview', $settings->enableVisualPreview);
         $settings->maxEntriesPerRelease = (int)Craft::$app->getRequest()->getBodyParam('maxEntriesPerRelease', $settings->maxEntriesPerRelease);
 
+        foreach (['navLabel', 'navIcon', 'navIconSvg'] as $name) {
+            $value = Craft::$app->getRequest()->getBodyParam($name, $settings->$name);
+            $settings->$name = is_string($value) && trim($value) !== '' ? $value : null;
+        }
+
         if (!$settings->validate()) {
             Craft::$app->getSession()->setError(Craft::t('peek', 'Could not save settings.'));
+            // The plugin's own settings object, so the form re-renders with these values and errors.
             return null;
         }
 

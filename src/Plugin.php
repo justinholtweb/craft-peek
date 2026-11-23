@@ -11,6 +11,10 @@ use craft\elements\User;
 use craft\events\DefineHtmlEvent;
 use craft\events\DeleteElementEvent;
 use craft\events\DraftEvent;
+use craft\events\RegisterComponentTypesEvent;
+use craft\events\RegisterGqlQueriesEvent;
+use craft\events\RegisterGqlSchemaComponentsEvent;
+use craft\events\RegisterGqlTypesEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
 use craft\helpers\Cp;
@@ -18,8 +22,15 @@ use craft\helpers\Html;
 use craft\helpers\UrlHelper;
 use craft\services\Drafts;
 use craft\services\Elements;
+use craft\services\Gql;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
+use justinholtweb\peek\gql\queries\PeekQueries;
+use justinholtweb\peek\gql\types\PeekDraftDiffType;
+use justinholtweb\peek\gql\types\PeekDraftType;
+use justinholtweb\peek\gql\types\PeekFieldDiffType;
+use justinholtweb\peek\gql\types\PeekReleaseEntryType;
+use justinholtweb\peek\gql\types\PeekReleaseType;
 use justinholtweb\peek\models\Release;
 use justinholtweb\peek\models\Settings;
 use justinholtweb\peek\services\DiffService;
@@ -38,6 +49,13 @@ use yii\base\Event;
  */
 class Plugin extends BasePlugin
 {
+    /** GraphQL schema components (`peekDrafts:read`, `peekReleases:read`). */
+    public const GQL_SCOPE_DRAFTS = 'peekDrafts';
+    public const GQL_SCOPE_RELEASES = 'peekReleases';
+
+    /** The first Craft version whose MCP server Peek's tools are written for. */
+    public const MCP_MIN_CRAFT_VERSION = '5.12.1';
+
     public string $schemaVersion = '1.0.1';
     public bool $hasCpSettings = true;
     public bool $hasCpSection = true;
@@ -60,6 +78,18 @@ class Plugin extends BasePlugin
         $this->registerCpRoutes();
         $this->registerPermissions();
         $this->registerEventListeners();
+        $this->registerGraphQl();
+        $this->registerMcp();
+    }
+
+    /**
+     * Whether this Craft has the MCP server Peek's tools need (5.12.1 or later).
+     */
+    public static function mcpAvailable(?string $craftVersion = null): bool
+    {
+        return version_compare($craftVersion ?? Craft::$app->getVersion(), self::MCP_MIN_CRAFT_VERSION, '>=')
+            && class_exists(\craft\services\Mcp::class)
+            && class_exists(\Mcp\Capability\Attribute\McpTool::class);
     }
 
     public function getCpNavItem(): ?array
@@ -68,7 +98,25 @@ class Plugin extends BasePlugin
         if ($nav === null) {
             return null;
         }
-        $nav['label'] = 'Peek';
+        $settings = $this->getSettings();
+
+        $label = trim((string)$settings->navLabel);
+        $nav['label'] = $label !== '' ? $label : 'Peek';
+
+        // SVG > icon name > Peek's own icon
+        $svg = trim((string)$settings->navIconSvg);
+        $icon = trim((string)$settings->navIcon);
+
+        if ($svg !== '' && Settings::isSvgMarkup($svg)) {
+            try {
+                // Sanitized on every render, never trusted as stored.
+                $nav['icon'] = Html::svg($svg, true, true, true);
+            } catch (\Throwable) {
+                // Keep Peek's own icon.
+            }
+        } elseif ($icon !== '' && Settings::iconExists($icon)) {
+            $nav['icon'] = $icon;
+        }
 
         $nav['subnav'] = [];
 
@@ -308,6 +356,52 @@ JS, [$id, $draft->id, Craft::t('peek', 'Entry added to release.')]);
             Html::tag('div', Html::tag('select', implode('', $options)), ['class' => 'select small']) .
             Html::button(Craft::t('peek', 'Add'), ['type' => 'button', 'class' => 'btn small']),
             ['id' => $id, 'class' => 'flex mt-xs']
+        );
+    }
+
+    private function registerGraphQl(): void
+    {
+        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_TYPES, function(RegisterGqlTypesEvent $event) {
+            $event->types[] = PeekDraftType::class;
+            $event->types[] = PeekFieldDiffType::class;
+            $event->types[] = PeekDraftDiffType::class;
+            $event->types[] = PeekReleaseEntryType::class;
+            $event->types[] = PeekReleaseType::class;
+        });
+
+        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_QUERIES, function(RegisterGqlQueriesEvent $event) {
+            $event->queries = array_merge($event->queries, PeekQueries::getQueries());
+        });
+
+        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_SCHEMA_COMPONENTS, function(RegisterGqlSchemaComponentsEvent $event) {
+            $event->queries[Craft::t('peek', 'Peek')] = [
+                self::GQL_SCOPE_DRAFTS . ':read' => [
+                    'label' => Craft::t('peek', 'Query drafts and their diffs (peekDrafts, peekDraftDiff)'),
+                ],
+                self::GQL_SCOPE_RELEASES . ':read' => [
+                    'label' => Craft::t('peek', 'Query releases (peekReleases, peekRelease)'),
+                ],
+            ];
+        });
+    }
+
+    /**
+     * MCP tools, on Craft 5.12.1 and later. Nothing here touches an MCP class on older Craft, where
+     * the server doesn't exist.
+     */
+    private function registerMcp(): void
+    {
+        if (!self::mcpAvailable()) {
+            return;
+        }
+
+        Event::on(
+            \craft\services\Mcp::class,
+            \craft\services\Mcp::EVENT_REGISTER_CAPABILITY_TYPES,
+            static function(RegisterComponentTypesEvent $event) {
+                $event->types[] = mcp\DraftTools::class;
+                $event->types[] = mcp\ReleaseTools::class;
+            },
         );
     }
 

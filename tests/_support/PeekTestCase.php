@@ -3,6 +3,7 @@
 namespace justinholtweb\peek\tests\Support;
 
 use Craft;
+use craft\db\Table;
 use craft\elements\Entry;
 use craft\elements\User;
 use craft\enums\PropagationMethod;
@@ -181,5 +182,54 @@ abstract class PeekTestCase extends TestCase
         }
 
         return $draft;
+    }
+
+    /**
+     * An active, non-admin user with exactly these permissions (lower-case names).
+     *
+     * @param string[] $permissions
+     */
+    protected function createUser(array $permissions): User
+    {
+        $user = new User(['username' => 'peek-user-' . uniqid(), 'email' => uniqid('peek-') . '@example.com']);
+        self::assertTrue(Craft::$app->getElements()->saveElement($user, false));
+        Craft::$app->getUsers()->activateUser($user);
+        Craft::$app->getUserPermissions()->saveUserPermissions($user->id, $permissions);
+
+        /** @var User $user */
+        $user = User::find()->id($user->id)->one();
+
+        return $user;
+    }
+
+    /**
+     * Section permissions for the test section: `view` (read others' drafts) or `publish`
+     * (everything Craft's editor asks of someone applying another author's draft).
+     *
+     * @return string[]
+     */
+    protected function sectionPermissions(string $level): array
+    {
+        $uid = $this->ensureSection()->uid;
+        $view = ["viewentries:$uid", "viewpeerentries:$uid", "viewpeerentrydrafts:$uid"];
+
+        return $level === 'publish'
+            ? [...$view, "saveentries:$uid", "savepeerentries:$uid", "savepeerentrydrafts:$uid"]
+            : $view;
+    }
+
+    /**
+     * Backdates a draft's `dateUpdated` directly — element saves always stamp it with now.
+     */
+    protected function backdateDraft(Entry $draft, string $modifier): void
+    {
+        $date = (new \DateTime())->modify($modifier)->format('Y-m-d H:i:s');
+
+        foreach ([Table::ELEMENTS, Table::ELEMENTS_SITES] as $table) {
+            $column = $table === Table::ELEMENTS ? 'id' : 'elementId';
+            Craft::$app->getDb()->createCommand()
+                ->update($table, ['dateUpdated' => $date], [$column => $draft->id])
+                ->execute();
+        }
     }
 }

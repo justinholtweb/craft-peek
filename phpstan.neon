@@ -6,3 +6,7 @@ parameters:
     phpVersion: 80200
     paths:
         - src
+    # Peek's dev install is Craft 5.10, which has no MCP server. These stand in for the Craft
+    # 5.12.1 / mcp/sdk classes src/mcp uses (registered only on 5.12.1+).
+    scanFiles:
+        - tests/_stubs/mcp.php
