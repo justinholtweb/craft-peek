@@ -368,6 +368,12 @@ GQL);
         $this->assertSame('(none)', $redacted(Entry::find()->id(0)));
         // Values without elements are shown as before.
         $this->assertSame('plain', $redacted('plain'));
+        // Option fields hold plain values: shown.
+        $this->assertSame('blue', $redacted(new \craft\fields\data\SingleOptionFieldData('Blue', 'blue', true)));
+        $this->assertSame("a\nb", $redacted(new \craft\fields\data\MultiOptionsFieldData([
+            new \craft\fields\data\OptionData('A', 'a', true),
+            new \craft\fields\data\OptionData('B', 'b', true),
+        ])));
         $this->assertStringContainsString('"a": 1', $redacted(['a' => 1]));
         $this->assertSame('[]', $redacted(collect([])), 'An empty collection holds nothing to hide.');
 

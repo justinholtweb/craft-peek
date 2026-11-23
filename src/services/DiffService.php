@@ -12,6 +12,8 @@ use craft\fields\BaseRelationField;
 use craft\fields\Categories as CategoriesField;
 use craft\fields\Color as ColorField;
 use craft\fields\data\LinkData;
+use craft\fields\data\MultiOptionsFieldData;
+use craft\fields\data\OptionData;
 use craft\fields\Date as DateField;
 use craft\fields\Email as EmailField;
 use craft\fields\Entries as EntriesField;
@@ -218,6 +220,15 @@ class DiffService extends Component
         if ($redact) {
             if ($field instanceof BaseRelationField) {
                 return $this->_relationCount($value);
+            }
+
+            // Dropdowns, radios, checkboxes, multi-selects: plain values, never elements
+            if ($value instanceof OptionData) {
+                return (string)$value->value;
+            }
+
+            if ($value instanceof MultiOptionsFieldData) {
+                return implode("\n", array_map(fn(OptionData $option) => (string)$option->value, $value->getArrayCopy()));
             }
 
             // An element link's text is the element's URL

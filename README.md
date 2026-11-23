@@ -129,6 +129,7 @@ out:
 - A Link field pointing at an element is `1 linked element`; a plain URL link is shown.
 - Rich text is read from its stored HTML, without its tags and reference tags, and is never
   rendered (rendering can pull in other elements).
+- Option fields (dropdowns, radios, checkboxes, multi-selects) show their values.
 - Any other object value, such as a third-party field's, is `(not shown over GraphQL)`, and so is
   an array that holds anything but plain values and dates. Plain arrays, such as Table fields, are
   shown.
