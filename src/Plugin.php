@@ -1,353 +1,223 @@
 <?php
 
-namespace justinholtweb\peek;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Element;
-use craft\base\Model;
-use craft\base\Plugin as BasePlugin;
-use craft\elements\Entry;
-use craft\elements\User;
-use craft\events\DefineHtmlEvent;
-use craft\events\DeleteElementEvent;
-use craft\events\DraftEvent;
-use craft\events\RegisterUrlRulesEvent;
-use craft\events\RegisterUserPermissionsEvent;
-use craft\helpers\Cp;
-use craft\helpers\Html;
-use craft\helpers\UrlHelper;
-use craft\services\Drafts;
-use craft\services\Elements;
-use craft\services\UserPermissions;
-use craft\web\UrlManager;
-use justinholtweb\peek\models\Release;
-use justinholtweb\peek\models\Settings;
-use justinholtweb\peek\services\DiffService;
-use justinholtweb\peek\services\DraftService;
-use justinholtweb\peek\services\Releases;
-use yii\base\Event;
+namespace JustinHoltWeb\Peek;
+
+use CraftCms\Cms\Cp\Data\NavItem;
+use CraftCms\Cms\Element\Events\DraftApplied;
+use CraftCms\Cms\Element\Events\DraftApplying;
+use CraftCms\Cms\Element\Events\ElementDeleting;
+use CraftCms\Cms\Element\Events\ElementMetadataResolving;
+use CraftCms\Cms\Plugin\Plugin as BasePlugin;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Ui\Controls\Choice;
+use CraftCms\Cms\Ui\Controls\Lightswitch;
+use CraftCms\Cms\Ui\Controls\Number;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\Ui\UiContext;
+use CraftCms\Cms\User\Data\Permission;
+use Illuminate\Console\Scheduling\Schedule;
+use JustinHoltWeb\Peek\Console\Commands\MoveToCraftCommand;
+use JustinHoltWeb\Peek\Console\Commands\ReleasesListCommand;
+use JustinHoltWeb\Peek\Console\Commands\ReleasesPublishCommand;
+use JustinHoltWeb\Peek\Console\Commands\ReleasesStatusCommand;
+use JustinHoltWeb\Peek\Console\Commands\SchedulerCheckCommand;
+use JustinHoltWeb\Peek\Listeners\AddEditorMetadata;
+use JustinHoltWeb\Peek\Listeners\RemoveDiscardedDraft;
+use JustinHoltWeb\Peek\Listeners\TrackAppliedDraft;
+use JustinHoltWeb\Peek\Models\Settings;
+use JustinHoltWeb\Peek\Services\Diff;
+use JustinHoltWeb\Peek\Services\PendingDrafts;
+use JustinHoltWeb\Peek\Services\Releases;
+use JustinHoltWeb\Peek\Services\ReleaseSystem;
+use Override;
+
+use function CraftCms\Cms\currentUser;
+use function CraftCms\Cms\t;
 
 /**
- * Peek — Content Staging & Visual Diff for Craft CMS
+ * Peek: content staging, visual diff and coordinated releases.
  *
- * @property Releases $releases
- * @property DiffService $diff
- * @property DraftService $drafts
- * @property Settings $settings
  * @method Settings getSettings()
  */
 class Plugin extends BasePlugin
 {
+    public const string PERMISSION_ACCESS = 'peek:accessPlugin';
+
+    public const string PERMISSION_VIEW_DIFFS = 'peek:viewDiffs';
+
+    public const string PERMISSION_MANAGE_RELEASES = 'peek:manageReleases';
+
+    public const string PERMISSION_PUBLISH_RELEASES = 'peek:publishReleases';
+
+    public const string PERMISSION_SCHEDULE_RELEASES = 'peek:scheduleReleases';
+
+    public const string PERMISSION_DELETE_RELEASES = 'peek:deleteReleases';
+
+    public const string PERMISSION_MANAGE_SETTINGS = 'peek:manageSettings';
+
+    /** Unchanged from 5.x: the tables are the same. */
     public string $schemaVersion = '1.0.1';
-    public bool $hasCpSettings = true;
+
+    /**
+     * Sites upgrade from the last Peek 5 release, so every 5.x migration has run and
+     * `database/migrations/Install.php` can describe the final schema.
+     */
+    public string $minVersionRequired = '5.1.2';
+
     public bool $hasCpSection = true;
 
-    public static function config(): array
+    public bool $hasCpSettings = true;
+
+    protected array $styles = [
+        __DIR__.'/../resources/css/peek.css' => 'css/peek.css',
+    ];
+
+    protected array $scripts = [
+        __DIR__.'/../resources/js/peek.js' => 'js/peek.js',
+    ];
+
+    protected array $commands = [
+        ReleasesListCommand::class,
+        ReleasesStatusCommand::class,
+        ReleasesPublishCommand::class,
+        SchedulerCheckCommand::class,
+        MoveToCraftCommand::class,
+    ];
+
+    protected array $events = [
+        DraftApplying::class => TrackAppliedDraft::class,
+        DraftApplied::class => TrackAppliedDraft::class,
+        ElementDeleting::class => RemoveDiscardedDraft::class,
+        ElementMetadataResolving::class => AddEditorMetadata::class,
+    ];
+
+    #[Override]
+    protected static function createSettings(): Settings
     {
-        return [
-            'components' => [
-                'releases' => Releases::class,
-                'diff' => DiffService::class,
-                'drafts' => DraftService::class,
-            ],
-        ];
+        return new Settings;
     }
 
-    public function init(): void
+    public function register(): void
     {
-        parent::init();
+        parent::register();
 
-        $this->registerCpRoutes();
-        $this->registerPermissions();
-        $this->registerEventListeners();
-    }
-
-    public function getCpNavItem(): ?array
-    {
-        $nav = parent::getCpNavItem();
-        if ($nav === null) {
-            return null;
-        }
-        $nav['label'] = 'Peek';
-
-        $nav['subnav'] = [];
-
-        if (Craft::$app->getUser()->checkPermission('peek:accessPlugin')) {
-            $nav['subnav']['dashboard'] = [
-                'label' => Craft::t('peek', 'Dashboard'),
-                'url' => 'peek',
-            ];
-
-            $nav['subnav']['releases'] = [
-                'label' => Craft::t('peek', 'Releases'),
-                'url' => 'peek/releases',
-            ];
-        }
-
-        if (Craft::$app->getUser()->getIsAdmin() ||
-            Craft::$app->getUser()->checkPermission('peek:manageSettings')) {
-            $nav['subnav']['settings'] = [
-                'label' => Craft::t('peek', 'Settings'),
-                'url' => 'peek/settings',
-            ];
-        }
-
-        return $nav;
-    }
-
-    protected function createSettingsModel(): ?Model
-    {
-        return new Settings();
-    }
-
-    protected function settingsHtml(): ?string
-    {
-        return Craft::$app->getView()->renderTemplate('peek/settings/_index', [
-            'settings' => $this->getSettings(),
-            'plugin' => $this,
-        ]);
-    }
-
-    private function registerCpRoutes(): void
-    {
-        Event::on(
-            UrlManager::class,
-            UrlManager::EVENT_REGISTER_CP_URL_RULES,
-            function(RegisterUrlRulesEvent $event) {
-                // Dashboard
-                $event->rules['peek'] = 'peek/dashboard/index';
-
-                // Releases
-                $event->rules['peek/releases'] = 'peek/releases/index';
-                $event->rules['peek/releases/new'] = 'peek/releases/edit';
-                $event->rules['peek/releases/<releaseId:\d+>'] = 'peek/releases/edit';
-
-                // Diff
-                $event->rules['peek/diff/<draftId:\d+>'] = 'peek/diff/view';
-                $event->rules['peek/diff/<draftId:\d+>/preview'] = 'peek/diff/preview';
-
-                // Settings
-                $event->rules['peek/settings'] = 'peek/settings/index';
-            }
-        );
-    }
-
-    /** @var int[] Draft IDs currently being applied (to prevent delete handler from removing them) */
-    private array $_applyingDraftIds = [];
-
-    private function registerEventListeners(): void
-    {
-        // Before a draft is applied: mark it published in releases and track it
-        // (must happen before apply because the FK SET NULL clears draftId during delete)
-        Event::on(
-            Drafts::class,
-            Drafts::EVENT_BEFORE_APPLY_DRAFT,
-            function(DraftEvent $event) {
-                if ($event->draft) {
-                    $this->_applyingDraftIds[] = $event->draft->id;
-                    $this->releases->markEntryPublishedByDraftId($event->draft->id);
-                }
-            }
-        );
-
-        // After apply: clean up the tracking list
-        Event::on(
-            Drafts::class,
-            Drafts::EVENT_AFTER_APPLY_DRAFT,
-            function(DraftEvent $event) {
-                if ($event->draft) {
-                    $this->_applyingDraftIds = array_diff($this->_applyingDraftIds, [$event->draft->id]);
-                }
-            }
-        );
-
-        // When a draft is truly deleted (not applied), remove it from releases
-        Event::on(
-            Elements::class,
-            Elements::EVENT_BEFORE_DELETE_ELEMENT,
-            function(DeleteElementEvent $event) {
-                $element = $event->element;
-                if ($element instanceof Entry && $element->getIsDraft()) {
-                    // Skip if this draft is being applied (not truly deleted)
-                    if (in_array($element->id, $this->_applyingDraftIds)) {
-                        return;
-                    }
-                    $this->releases->removeEntryByDraftId($element->id);
-                }
-            }
-        );
-
-        // Inject Peek sidebar panel on draft entries in the CP
-        if (Craft::$app->getRequest()->getIsCpRequest()) {
-            Event::on(
-                Entry::class,
-                Element::EVENT_DEFINE_SIDEBAR_HTML,
-                function(DefineHtmlEvent $event) {
-                    /** @var Entry $entry */
-                    $entry = $event->sender;
-
-                    if (!$entry->getIsDraft() || $entry->isProvisionalDraft) {
-                        return;
-                    }
-
-                    $event->html .= $this->_renderPeekSidebar($entry);
-                }
-            );
+        // Releases remembers which drafts are mid-apply, so the listeners must share one instance.
+        foreach ([Releases::class, ReleaseSystem::class, Diff::class, PendingDrafts::class] as $service) {
+            $this->app->singleton($service);
         }
     }
 
-    private function _renderPeekSidebar(Entry $draft): string
+    public function boot(): void
     {
-        /** @var Entry $canonical */
-        $canonical = $draft->getCanonical();
-        if ($canonical->id === $draft->id) {
-            return '';
-        }
-
-        $user = Craft::$app->getUser()->getIdentity();
-        if ($user === null || !$user->can('peek:accessPlugin')) {
-            return '';
-        }
-
-        $meta = [];
-
-        if ($user->can('peek:viewDiffs')) {
-            // Count the saved draft, the way the diff page loads it. The editor's own element can
-            // hold field values the diff page never sees (eager-loaded relations, preloaded
-            // Matrix blocks), and before 5.1.2 the two counts disagreed (issue #3).
-            $saved = Entry::find()
-                ->id($draft->id)
-                ->siteId($draft->siteId)
-                ->drafts(true)
-                ->provisionalDrafts(false)
-                ->status(null)
-                ->one() ?? $draft;
-            /** @var Entry $savedCanonical */
-            $savedCanonical = $saved === $draft ? $canonical : $saved->getCanonical();
-
-            $changedCount = 0;
-            foreach ($this->diff->diffEntry($saved, $savedCanonical) as $diff) {
-                if ($diff->hasChanges) {
-                    $changedCount++;
-                }
-            }
-
-            $meta[Craft::t('peek', 'Fields Changed')] = (string)$changedCount;
-            $meta[Craft::t('peek', 'Diff')] = Html::a(Craft::t('peek', 'View Diff'), UrlHelper::cpUrl("peek/diff/{$draft->id}", ['siteId' => $draft->siteId]), ['class' => 'go']);
-        }
-
-        if ($user->can('peek:manageReleases')) {
-            $releases = $this->releases->getReleasesForDraft($draft->id);
-            $releasesHtml = '';
-
-            foreach ($releases as $release) {
-                $releasesHtml .= Html::a(Html::encode($release->name), UrlHelper::cpUrl("peek/releases/{$release->id}"))
-                    . ' <span class="status ' . $release->status->color() . '"></span><br>';
-            }
-
-            if ($releasesHtml === '') {
-                $releasesHtml = '<span class="light">' . Craft::t('peek', 'Not in any release') . '</span>';
-            }
-
-            $meta[Craft::t('peek', 'Releases')] = $releasesHtml . $this->_addToReleaseHtml($draft, $releases, $user);
-        }
-
-        if ($meta === []) {
-            return '';
-        }
-
-        return Html::tag('fieldset',
-            Html::tag('legend', 'Peek', ['class' => 'h6']) .
-            Cp::metadataHtml($meta)
-        );
+        $this->app->bind(Settings::class, fn () => $this->getSettings());
     }
 
     /**
-     * A picker for the open releases this draft isn't in yet. The sidebar sits inside the entry's
-     * own form, so it posts with `Craft.sendActionRequest()` rather than a form of its own.
-     *
-     * @param Release[] $current
+     * Peek's scheduled releases publish themselves. On a site that runs Laravel's scheduler
+     * (`php artisan schedule:work`, or `schedule:run` from cron) there's nothing else to set up;
+     * otherwise run `peek:scheduler:check` from cron every minute, as on 5.x.
      */
-    private function _addToReleaseHtml(Entry $draft, array $current, User $user): string
+    #[Override]
+    protected function schedule(Schedule $schedule): void
     {
-        $elements = Craft::$app->getElements();
-        if (!$elements->canSave($draft, $user) || !$elements->canSaveCanonical($draft, $user)) {
-            return '';
-        }
-
-        $currentIds = array_map(fn(Release $release) => $release->id, $current);
-        $options = [];
-
-        foreach ($this->releases->getAllReleases() as $release) {
-            if ($this->releases->isEditable($release) && !in_array($release->id, $currentIds, true)) {
-                $options[] = Html::tag('option', Html::encode($release->name), ['value' => $release->id]);
-            }
-        }
-
-        if ($options === []) {
-            return '';
-        }
-
-        $id = 'peek-add-' . $draft->id;
-        $view = Craft::$app->getView();
-        $view->registerJsWithVars(fn($id, $draftId, $added) => <<<JS
-(() => {
-    const wrap = document.getElementById($id);
-    if (!wrap) return;
-    wrap.querySelector('button').addEventListener('click', () => {
-        const releaseId = wrap.querySelector('select').value;
-        if (!releaseId) return;
-        Craft.sendActionRequest('POST', 'peek/releases/add-entry', {data: {releaseId, draftId: $draftId}})
-            .then(() => { Craft.cp.displaySuccess($added); window.location.reload(); })
-            .catch(({response}) => Craft.cp.displayError(response?.data?.message));
-    });
-})();
-JS, [$id, $draft->id, Craft::t('peek', 'Entry added to release.')]);
-
-        return Html::tag('div',
-            Html::tag('div', Html::tag('select', implode('', $options)), ['class' => 'select small']) .
-            Html::button(Craft::t('peek', 'Add'), ['type' => 'button', 'class' => 'btn small']),
-            ['id' => $id, 'class' => 'flex mt-xs']
-        );
+        $schedule->command(SchedulerCheckCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->name('peek:scheduler:check');
     }
 
-    private function registerPermissions(): void
+    #[Override]
+    protected function getPermissions(): array
     {
-        Event::on(
-            UserPermissions::class,
-            UserPermissions::EVENT_REGISTER_PERMISSIONS,
-            function(RegisterUserPermissionsEvent $event) {
-                $event->permissions[] = [
-                    'heading' => Craft::t('peek', 'Peek'),
-                    'permissions' => [
-                        'peek:accessPlugin' => [
-                            'label' => Craft::t('peek', 'Access Peek'),
-                            'nested' => [
-                                'peek:viewDiffs' => [
-                                    'label' => Craft::t('peek', 'View diffs'),
-                                ],
-                                'peek:manageReleases' => [
-                                    'label' => Craft::t('peek', 'Manage releases'),
-                                    'nested' => [
-                                        'peek:publishReleases' => [
-                                            'label' => Craft::t('peek', 'Publish releases'),
-                                        ],
-                                        'peek:scheduleReleases' => [
-                                            'label' => Craft::t('peek', 'Schedule releases'),
-                                        ],
-                                        'peek:deleteReleases' => [
-                                            'label' => Craft::t('peek', 'Delete releases'),
-                                        ],
-                                    ],
-                                ],
-                            ],
-                        ],
-                        'peek:manageSettings' => [
-                            'label' => Craft::t('peek', 'Manage Peek settings'),
-                        ],
-                    ],
-                ];
+        return [
+            new Permission(
+                key: self::PERMISSION_ACCESS,
+                label: t('Access Peek', category: 'peek'),
+                nested: collect([
+                    new Permission(
+                        key: self::PERMISSION_VIEW_DIFFS,
+                        label: t('View diffs', category: 'peek'),
+                    ),
+                    new Permission(
+                        key: self::PERMISSION_MANAGE_RELEASES,
+                        label: t('Manage releases', category: 'peek'),
+                        info: t('Peek’s own releases, on Craft Solo and Team. Craft Pro and Enterprise use Craft’s release permissions.', category: 'peek'),
+                        nested: collect([
+                            new Permission(key: self::PERMISSION_PUBLISH_RELEASES, label: t('Publish releases', category: 'peek')),
+                            new Permission(key: self::PERMISSION_SCHEDULE_RELEASES, label: t('Schedule releases', category: 'peek')),
+                            new Permission(key: self::PERMISSION_DELETE_RELEASES, label: t('Delete releases', category: 'peek')),
+                        ]),
+                    ),
+                ]),
+            ),
+            new Permission(
+                key: self::PERMISSION_MANAGE_SETTINGS,
+                label: t('Manage Peek settings', category: 'peek'),
+            ),
+        ];
+    }
+
+    #[Override]
+    public function getCpNavItem(): NavItem|array|null
+    {
+        $item = parent::getCpNavItem();
+        $user = currentUser();
+
+        if (! $item instanceof NavItem || $user === null || ! $user->can(self::PERMISSION_ACCESS)) {
+            return null;
+        }
+
+        $subnav = [
+            new NavItem()->label(t('Dashboard', category: 'peek'))->href('peek'),
+        ];
+
+        $system = $this->app->make(ReleaseSystem::class);
+
+        if ($system->usesCraft()) {
+            // Craft's own Releases screen; Peek's list stays reachable for releases made before.
+            if ($user->can('manageReleases') || $user->can('publishReleases')) {
+                $subnav[] = new NavItem()->label(t('Releases', category: 'peek'))->href('releases');
             }
-        );
+
+            // Releases made in Peek before (an upgrade, or a Team site that moved up), until
+            // they're published or moved across.
+            if ($user->can(self::PERMISSION_MANAGE_RELEASES) && $system->hasUnfinishedPeekReleases()) {
+                $subnav[] = new NavItem()->label(t('Earlier releases', category: 'peek'))->href('peek/releases');
+            }
+        } elseif ($user->can(self::PERMISSION_MANAGE_RELEASES)) {
+            $subnav[] = new NavItem()->label(t('Releases', category: 'peek'))->href('peek/releases');
+        }
+
+        if ($user->isAdmin() || $user->can(self::PERMISSION_MANAGE_SETTINGS)) {
+            $subnav[] = new NavItem()->label(t('Settings', category: 'peek'))->href('settings/plugins/peek');
+        }
+
+        return $item->subnav($subnav);
+    }
+
+    #[Override]
+    public function settingsUi(UiContext $context = new UiContext): ?Ui
+    {
+        $sites = [['label' => t('Primary site', category: 'peek'), 'value' => '']];
+
+        foreach (Sites::getAllSites() as $site) {
+            $sites[] = ['label' => $site->getName(), 'value' => (string) $site->id];
+        }
+
+        return Ui::make([
+            Field::make(t('Stale draft threshold', category: 'peek'), Number::make('staleDraftDays')->min(1)->suffix(t('days', category: 'peek')))
+                ->instructions(t('Drafts with no save in this many days are flagged on the dashboard.', category: 'peek'))
+                ->required(),
+            Field::make(t('Default site for releases', category: 'peek'), Choice::make('defaultSiteId')->options($sites))
+                ->instructions(t('The site new releases start on. Applies to Peek’s own releases (Craft Solo and Team).', category: 'peek')),
+            Field::make(t('Visual preview', category: 'peek'), Lightswitch::make('enableVisualPreview'))
+                ->instructions(t('Show the live page and the draft side by side on the diff screen.', category: 'peek')),
+            Field::make(t('Most drafts per release', category: 'peek'), Number::make('maxEntriesPerRelease')->min(1)->max(500))
+                ->instructions(t('Applies to Peek’s own releases.', category: 'peek'))
+                ->required(),
+        ]);
     }
 }

@@ -1,0 +1,300 @@
+/*
+ * Peek — control panel styles. Craft 6 loads this on every CP page, so every rule is scoped to a
+ * peek- class. Most Craft 5 colour variables are gone in the Craft 6 CP: each var() has a fallback.
+ */
+
+/* Dashboard */
+.peek-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.peek-card {
+    border: 1px solid var(--hairline-color, #e3e5e8);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.peek-card h2 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--medium-text-color, #606d7b);
+}
+
+.peek-stat-value {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.peek-stat--warning {
+    color: #b45309;
+}
+
+.peek-stat-label,
+.peek-light {
+    color: var(--light-text-color, #8f98a3);
+    font-size: 12px;
+}
+
+.peek-section {
+    margin-bottom: 24px;
+}
+
+.peek-section h2 {
+    font-size: 15px;
+    margin: 0 0 8px;
+}
+
+.peek-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.peek-table th,
+.peek-table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--hairline-color, #e3e5e8);
+    vertical-align: top;
+}
+
+.peek-table th {
+    font-weight: 600;
+    color: var(--medium-text-color, #606d7b);
+}
+
+.peek-thin {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.peek-btn {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--hairline-color, #cdd2d8);
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.peek-empty {
+    color: var(--light-text-color, #8f98a3);
+    padding: 24px 0;
+}
+
+/* Status labels and dots */
+.peek-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.peek-status::before,
+.peek-dot {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9aa5b1;
+    flex: none;
+}
+
+.peek-status--green::before, .peek-dot--green { background: #10b981; }
+.peek-status--blue::before, .peek-dot--blue { background: #3b82f6; }
+.peek-status--orange::before, .peek-dot--orange { background: #f59e0b; }
+.peek-status--yellow::before, .peek-dot--yellow { background: #eab308; }
+.peek-status--red::before, .peek-dot--red { background: #ef4444; }
+
+/* Diff screen */
+.peek-diff-meta {
+    font-size: 13px;
+    color: var(--light-text-color, #8f98a3);
+    margin-bottom: 16px;
+}
+
+.peek-diff-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--hairline-color, #e3e5e8);
+    padding-bottom: 12px;
+}
+
+.peek-tab {
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--hairline-color, #cdd2d8);
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.peek-tab.is-active {
+    background: #1f2937;
+    border-color: #1f2937;
+    color: #fff;
+}
+
+.peek-field-diff {
+    border: 1px solid var(--hairline-color, #e3e5e8);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.peek-field-diff.no-changes {
+    opacity: 0.55;
+}
+
+.peek-field-diff-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    border: 0;
+    background: rgba(0, 0, 0, 0.025);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.peek-field-diff.no-changes .peek-field-diff-header {
+    cursor: default;
+}
+
+.peek-field-handle {
+    color: var(--light-text-color, #8f98a3);
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.peek-field-diff-body {
+    padding: 14px;
+    overflow-x: auto;
+}
+
+.peek-field-diff.is-collapsed .peek-field-diff-body {
+    display: none;
+}
+
+.peek-field-diff-body p {
+    margin: 0;
+}
+
+/* jfcherng/php-diff SideBySide tables */
+.peek-field-diff-body table.diff {
+    width: 100%;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    border-collapse: collapse;
+}
+
+.peek-field-diff-body table.diff td {
+    padding: 2px 8px;
+    vertical-align: top;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.peek-field-diff-body table.diff .old { background: #ffeef0; }
+.peek-field-diff-body table.diff .new { background: #e6ffec; }
+.peek-field-diff-body table.diff del { background: #fdb8c0; text-decoration: none; }
+.peek-field-diff-body table.diff ins { background: #acf2bd; text-decoration: none; }
+
+.peek-field-diff-body table.diff .n-old,
+.peek-field-diff-body table.diff .n-new,
+.peek-field-diff-body table.diff th {
+    color: var(--light-text-color, #8f98a3);
+    font-weight: normal;
+    width: 1%;
+    min-width: 32px;
+    text-align: right;
+    user-select: none;
+}
+
+.peek-simple-diff {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.peek-diff-removed,
+.peek-diff-added {
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+
+.peek-diff-removed { background: #ffeef0; border-left: 3px solid #f97583; }
+.peek-diff-added { background: #e6ffec; border-left: 3px solid #85e89d; }
+
+.peek-boolean-diff {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.peek-boolean-diff .peek-diff-removed,
+.peek-boolean-diff .peek-diff-added {
+    display: inline;
+    padding: 2px 8px;
+    border-left: 0;
+}
+
+/* Visual preview */
+.peek-preview-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    height: calc(100dvh - 260px);
+    min-height: 420px;
+}
+
+.peek-preview-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.peek-preview-pane h3 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--medium-text-color, #606d7b);
+}
+
+.peek-preview-iframe {
+    flex: 1;
+    width: 100%;
+    border: 1px solid var(--hairline-color, #e3e5e8);
+    border-radius: 4px;
+    background: #fff;
+}
+
+@media (max-width: 900px) {
+    .peek-preview-container,
+    .peek-simple-diff {
+        grid-template-columns: 1fr;
+    }
+
+    .peek-preview-container {
+        height: auto;
+    }
+
+    .peek-preview-iframe {
+        min-height: 60dvh;
+    }
+}

@@ -1,94 +1,217 @@
-# Peek — Content Staging & Visual Diff for Craft CMS 5
+# Peek — Content Staging & Visual Diff for Craft CMS 6
 
-Peek gives editorial teams field-by-field diff comparison, side-by-side visual preview, and coordinated multi-entry releases for Craft CMS 5.
+Peek gives editorial teams a word-level diff of every draft, a side-by-side visual preview, a
+dashboard of what's waiting to publish, and coordinated releases of several drafts at once.
+
+This is the `6.0.0` branch: a native Craft 6 plugin, built on Laravel, with no dependency on the
+Yii 2 adapter. **Craft 6 is in beta, and so is Peek 6.** Peek 5 (the `main` branch) is the stable
+release for Craft 5. Upgrading from Craft 5? Read [UPGRADING.md](UPGRADING.md).
 
 ## Features
 
-- **Field Diff** — Side-by-side comparison of every field between a draft and its live entry, with syntax-highlighted changes
-- **Visual Preview** — Two-pane iframe preview showing live vs. draft with synchronized scrolling
-- **Releases** — Group multiple drafts into a release and publish them atomically (all or nothing)
-- **Scheduled Publishing** — Set a future date and let Peek auto-publish via cron
-- **Dashboard** — Overview of pending drafts, stale drafts, and active releases across the site
-- **Entry Sidebar** — See changed field count, diff link and release membership in the draft editor, and add the draft to a release from there
+- **Field diff.** Every field of a draft compared with its live entry, word by word, side by side.
+  Matrix and Content Block fields are compared by what's in their nested entries.
+- **Visual preview.** The live page and the draft in two panes that scroll together.
+- **Dashboard.** Every saved draft you could open, the stale ones, drafts by section, open releases.
+- **Draft sidebar.** In the entry editor: how many fields a draft changes, a link to its diff, and
+  the releases it's in, with *Add to a release…*.
+- **Releases.** Group drafts and publish them all at once, or none of them. Schedule them. Publish
+  them from the command line in a deploy.
+
+## Releases on each Craft edition
+
+Craft 6 Pro and Enterprise have releases built in. Solo and Team don't. Peek uses one release
+system per site, so two systems never try to apply the same drafts:
+
+| | Craft Solo, Team | Craft Pro, Enterprise |
+| --- | --- | --- |
+| Release system | Peek's own | Craft's own (**Releases** in the CP) |
+| Where you manage releases | Peek → Releases | Craft's Releases screen (Peek's nav links there) |
+| Draft sidebar, *Add to a release…* | Peek's releases | Craft's releases |
+| Dashboard's *Active releases* | Peek's | Craft's, plus any of Peek's not yet finished |
+| `peek:releases:*` commands | Peek's | Craft's (`--source=peek` for Peek's) |
+| Permissions | Peek's *Manage/Publish/Schedule/Delete releases* | Craft's *Manage releases*, *Publish releases* |
+| Scheduling | Peek's scheduler (below) | Craft's |
+
+On Pro and Enterprise, releases made in Peek before (an upgraded Craft 5 site, or a Team site that
+moved up) can still be opened, published or deleted under Peek → Earlier releases (shown while there
+are any), but take no new drafts.
+Move them into Craft's releases with:
+
+```bash
+php artisan peek:releases:move-to-craft --dry-run        # what would move
+php artisan peek:releases:move-to-craft --as=jane        # move them, as a user with Craft's Manage releases
+```
+
+Each becomes a Craft release with the same name, description and drafts, scheduled again for the same
+time if it was scheduled. Craft lets a draft be in only one release, so a draft that was in two Peek
+releases moves with the first; the other keeps it and the command says so.
 
 ## Requirements
 
-- Craft CMS 5.0.0 or later
-- PHP 8.2 or later
+- Craft CMS 6.0.0-beta.1 or later
+- PHP 8.5 or later
 
 ## Installation
 
 ```bash
-composer require justinholtweb/craft-peek
-php craft plugin/install peek
+composer require "justinholtweb/craft-peek:^6.0@beta"
+php artisan craft:plugin:install peek
 ```
 
-## Scheduling
+## Field diff and Craft's Compare screen
 
-To enable scheduled releases, add a cron job that runs every minute:
+Craft 6 has a Compare screen of its own, which shows each field's preview side by side. Peek's diff
+is the text: it marks exactly which words changed, collapses the fields that didn't, and covers
+native attributes (title, slug, enabled) too. Peek's diff screen links to Craft's Compare screen
+(*Compare in Craft*) for the same draft.
 
+How each kind of field is compared:
+
+| Field | Compared as |
+| --- | --- |
+| Plain Text, Email, Color, Link, Number | The value |
+| CKEditor and other rich text | The text, without the markup |
+| Lightswitch | On / Off |
+| Date | `Y-m-d H:i:s` |
+| Entries, Users and other relations | `Title (#id)`, one per line |
+| Assets | `filename.ext (#id)`, one per line |
+| Matrix, Content Block | Each nested entry as `#n Type`, its title and field values, nested Matrix included |
+| Anything else | JSON |
+
+A field Peek can't read shows *This field can't be compared* instead of breaking the screen.
+
+## Scheduling (Peek's own releases)
+
+Peek registers its check on Laravel's scheduler, every minute. If the site runs the scheduler,
+there's nothing to set up:
+
+```bash
+* * * * * cd /path/to/site && php artisan schedule:run >> /dev/null 2>&1
 ```
-* * * * * /path/to/craft peek/scheduler/check
+
+If it doesn't, run Peek's check from cron yourself, as on Craft 5 (the old command name still works):
+
+```bash
+* * * * * cd /path/to/site && php craft peek/scheduler/check
 ```
+
+Due releases are queued (`PublishRelease`), so a queue worker has to be running too:
+`php artisan queue:work`. Craft's own releases (Pro, Enterprise) are scheduled by Craft.
 
 ## Console commands
 
-For deploy pipelines and scripts, releases can be listed, checked and published from the command line:
-
 ```bash
-php craft peek/releases/list                     # every release, newest first
-php craft peek/releases/list --status=ready --site=default --json
-php craft peek/releases/status 12                # one release, its entries, and anything that would stop it
-php craft peek/releases/publish 12 --dry-run     # check it could be published, apply nothing
-php craft peek/releases/publish 12 --interactive=0
-php craft peek/releases/publish 12 --as=jane@example.com
+php artisan peek:releases:list                       # newest first
+php artisan peek:releases:list --status=ready --site=default --json
+php artisan peek:releases:status 12                  # one release, its drafts, anything stopping it
+php artisan peek:releases:publish 12 --dry-run       # check it could publish, apply nothing
+php artisan peek:releases:publish 12 --no-interaction
+php artisan peek:releases:publish 12 --as=jane@example.com
+php artisan peek:scheduler:check
+php artisan peek:releases:move-to-craft --as=jane    # Pro and Enterprise
 ```
 
-- Every command takes `--json` for machine-readable output.
-- `status` exits `0` for a release that's fine and `1` for one that failed or can't be published as it
-  stands (no entries, a draft that's gone). A missing release exits `65`.
-- `publish` applies every draft in the release or none of them, exactly like the control panel's
-  Publish button, and exits `1` if nothing was published. It won't publish a release that's already
-  published, or one the scheduler has handed to the queue. Without `--interactive=0` it asks first.
+- `list`, `status` and `publish` take `--json` for machine-readable output.
+- `--source=peek|craft` picks the release system; it defaults to the site's. `list --all` shows both.
+- `status` exits `0` for a release that's fine and `1` for one that failed or can't publish as it
+  stands. `publish` exits `1` if nothing was published. A missing release or bad option exits `2`.
+- `publish` applies every draft or none, won't touch a published release, and won't race the queue
+  for one the scheduler has already handed over. Without `--no-interaction` it asks first.
+- The Craft 5 names still work through `php craft`: `peek/releases/list`, `peek/releases/status`,
+  `peek/releases/publish`, `peek/scheduler/check`.
 
-> **The console runs as the system.** There's no signed-in user, so `publish` applies the release's
-> drafts without checking anyone's permissions — whoever can run `php craft` can already change
-> anything on the site. Pass `--as=<username or email>` to hold the publish to one user's rights
-> instead: they need the Publish releases permission, and every draft must be one they could apply
-> in Craft's editor, or nothing is published. The user is recorded as the publisher.
+> **Peek's releases publish as the system from the console.** There's no signed-in user, so a Peek
+> release's drafts are applied without a permission check: whoever can run artisan can already
+> change anything. Pass `--as=<username or email>` to hold the publish to that user's rights.
+> **Craft's releases always publish as a user**, so on Pro and Enterprise `publish` needs `--as`.
+
+> **`-n` is `--no-interaction` in Craft 6.** In Peek 5 it meant `--dry-run`. So a 5.x script doesn't
+> publish by accident, `php craft peek/releases/publish 12 -n` (the Craft 5 name) is still a dry run,
+> and says so. Under the new name, `peek:releases:publish 12 -n` publishes. Write `--dry-run`.
 
 ## Permissions
 
-| Permission | Description |
-|---|---|
-| Access Peek | View the Peek CP section |
-| View diffs | View field-by-field diff comparisons |
-| Manage releases | Create, edit, and manage releases |
-| Publish releases | Publish releases (apply all drafts) |
-| Schedule releases | Set scheduled publish dates |
-| Delete releases | Delete releases |
-| Manage Peek settings | Access plugin settings |
+| Permission | What it allows |
+| --- | --- |
+| Access Peek | The Peek section and dashboard |
+| ↳ View diffs | The diff and preview screens, and the sidebar's diff rows |
+| ↳ Manage releases | Peek's releases: create, edit, add and remove drafts |
+| ↳↳ Publish releases | Publish one of Peek's releases |
+| ↳↳ Schedule releases | Give one of Peek's releases a date |
+| ↳↳ Delete releases | Delete one of Peek's releases |
+| Manage Peek settings | Peek's settings |
 
-Peek's permissions decide which Peek screens someone can use; Craft's entry permissions still decide
+Peek's permissions decide which screens someone can use. Craft's entry permissions still decide
 which drafts:
 
-- **Diffs** need the right to view the draft and its entry.
-- **Adding a draft** to a release, and **publishing** it, need what Craft's editor needs to apply
-  that draft — saving the draft and saving its entry. If the publisher can't apply any one draft,
-  nothing in the release is published.
-- **Scheduled releases** publish as the user who scheduled them, with that user's permissions at the
-  moment the release runs. If they can no longer publish a draft, lost the Schedule releases
-  permission, or are no longer active, the release is marked Failed and nothing is applied.
+- **A diff** needs the right to view the draft and its entry, and on a multi-site install, to edit
+  the draft's site.
+- **Adding a draft** to a release, and **publishing** it, need what Craft's own *Apply draft* needs:
+  saving the draft and saving its entry. If the publisher can't apply any one draft, nothing in the
+  release is published.
+- **A scheduled release** publishes as the user who scheduled it, with their permissions when it
+  runs. If they can't publish a draft any more, lost *Schedule releases*, or were deactivated, the
+  release is marked failed and nothing is published.
+- **The dashboard** lists only drafts the viewer could open in Craft's editor.
 
 ## Configuration
 
-Settings are available in the Craft CP under Peek > Settings, or via `config/peek.php`:
+Settings are in **Settings → Plugins → Peek**, or in `config/craft/peek.php`:
 
 ```php
+<?php
+
 return [
-    'staleDraftDays' => 14,
-    'defaultSiteId' => null,
-    'enableVisualPreview' => true,
-    'maxEntriesPerRelease' => 50,
+    'staleDraftDays' => 14,          // days without a save before a draft counts as stale
+    'defaultSiteId' => null,         // the site new Peek releases start on (null: primary)
+    'enableVisualPreview' => true,   // the Visual preview tab
+    'maxEntriesPerRelease' => 50,    // the most drafts one of Peek's releases can hold
 ];
 ```
+
+## Events
+
+```php
+use Illuminate\Support\Facades\Event;
+use JustinHoltWeb\Peek\Events\PeekReleasePublished;
+
+Event::listen(PeekReleasePublished::class, function (PeekReleasePublished $event) {
+    // $event->release (JustinHoltWeb\Peek\Models\Release), $event->user (null for a console publish)
+});
+```
+
+Craft's own releases dispatch `CraftCms\Cms\Release\Events\ReleasePublished`.
+
+## Troubleshooting
+
+**A draft's "Saved at" changed, but nobody edited it.** Opening an older draft in Craft's editor
+merges the entry's newer changes into it and saves it. That updates its date, moves it up Craft's
+drafts menu, and resets its age on Peek's dashboard. The name next to a draft in that menu is the
+person who created it, not who last saved it.
+
+**A Peek release says it can't take new drafts.** On Craft Pro and Enterprise, new drafts go into
+Craft's releases. Finish the Peek release, or move it with `peek:releases:move-to-craft`.
+
+**`publish` says "Craft's releases publish as a user".** On Pro and Enterprise, pass `--as=<user>`.
+The user needs Craft's *Publish releases* permission and the right to apply each draft.
+
+**Scheduled releases never publish.** Check that Laravel's scheduler runs (`php artisan
+schedule:list` shows `peek:scheduler:check`), or that cron runs `php craft peek/scheduler/check`,
+and that a queue worker is running.
+
+**The Visual preview's panes don't scroll together.** Scrolling is linked only when the site and the
+control panel share an origin; a browser won't let one origin read another's frame.
+
+## Development
+
+```bash
+composer install
+vendor/bin/pest          # a real Craft 6 install with Peek, on in-memory SQLite
+vendor/bin/pint --test
+vendor/bin/phpstan analyse --memory-limit=1G
+```
+
+## License
+
+Proprietary. See [LICENSE.md](LICENSE.md).

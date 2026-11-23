@@ -1,0 +1,29 @@
+<div class="peek-diff" data-peek-diff>
+    <div class="peek-diff-meta">
+        <span>{{ draft.draftName ?? ('Draft'|t('peek')) }}</span>
+        &middot; <span>{{ '{count, plural, =1{1 field changed} other{# fields changed}}'|t('peek', { count: changedCount }) }}</span>
+        &middot; <a href="{{ draft.getCpEditUrl() }}">{{ 'Edit draft'|t('peek') }}</a>
+        &middot; <a href="{{ compareUrl }}">{{ 'Compare in Craft'|t('peek') }}</a>
+    </div>
+
+    <div class="peek-diff-tabs" role="tablist">
+        <button type="button" class="peek-tab is-active" data-tab="field-diff" role="tab">{{ 'Field diff'|t('peek') }}</button>
+        {% if previewUrls.canonical and previewUrls.draft %}
+            <button type="button" class="peek-tab" data-tab="visual-preview" role="tab">{{ 'Visual preview'|t('peek') }}</button>
+        {% endif %}
+    </div>
+
+    <div class="peek-tab-content" data-tab-content="field-diff">
+        {% for diff in diffs %}
+            {% include 'peek/diff/_field-diff' with { diff: diff } only %}
+        {% else %}
+            <p class="peek-empty">{{ 'No differences found.'|t('peek') }}</p>
+        {% endfor %}
+    </div>
+
+    {% if previewUrls.canonical and previewUrls.draft %}
+        <div class="peek-tab-content" data-tab-content="visual-preview" hidden>
+            {% include 'peek/diff/_panes' with { previewUrls: previewUrls } only %}
+        </div>
+    {% endif %}
+</div>

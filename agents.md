@@ -1,321 +1,90 @@
-# Peek — Development Log
+# Peek — Craft CMS 6 (branch `6.0.0`)
 
-## Project Summary
+Peek is a content staging and visual diff plugin: field diff, visual preview, a drafts dashboard and
+coordinated releases. Single paid edition.
 
-Peek is a content staging and visual diff plugin for Craft CMS 5. Single paid edition. Three core features — Field Diff, Releases, and Dashboard — give editorial teams coordinated multi-entry publishing with side-by-side comparison.
+This branch is the native Craft 6 port. **Laravel only: no `craftcms/yii2-adapter`, no `yiisoft/yii2`,
+no `craft\`/`yii\` namespaces, no `Craft::`.** `bin/port-check craft-peek` in
+`~/Sites/plugin-testing-craft6` enforces it. Craft 5 is `main` (5.1.x), in `~/Sites/craft-peek`; this
+branch is the worktree `~/Sites/craft6-ports/craft-peek`. Fixes that apply to both go on `main` first.
 
-**Namespace:** `justinholtweb\peek`
-**Craft CMS:** ^5.0.0 | **PHP:** ^8.2
-**Dependencies:** `jfcherng/php-diff` ^6.0
-**Pattern source:** `/Users/jholt/Sites/craft-garrison/` (Plugin.php, Migration, Enum, Record patterns)
+- **Package:** `justinholtweb/craft-peek` 6.0.0-beta.1 · **Namespace:** `JustinHoltWeb\Peek` ·
+  **Handle:** `peek` · **Class:** `JustinHoltWeb\Peek\Plugin`
+- **Craft** `^6.0.0-beta.1` · **PHP** `^8.5` · **Dependency:** `jfcherng/php-diff` ^6.0
+- **Schema** 1.0.1 (unchanged from 5.x) · `$minVersionRequired = '5.1.2'`
+- Porting plan, cookbook and harness: `~/Sites/plugin-testing-craft6/{PLAN.md,porting/COOKBOOK.md}`
 
----
-
-## Phase 1: Plugin Skeleton & Database — COMPLETE
-
-### What was built
-
-**Plugin shell & configuration**
-- `Plugin.php` — registers 3 service components (`releases`, `diff`, `drafts`), CP routes, permissions, event listeners. Has CP section with subnav (Dashboard, Releases, Settings).
-- `composer.json` — full Plugin Store metadata including support section, changelogUrl, developerEmail.
-- `config.php` — default multi-env config with all settings documented.
-- `icon.svg` — magnifying glass with diff lines. Uses `currentColor` for light/dark theme support.
-
-**1 PHP 8.2 enum**
-- `ReleaseStatus` (draft/ready/scheduled/publishing/published/failed) — with `label()`, `color()`, `canTransitionTo()` methods
-
-**4 models**
-- `Settings` — staleDraftDays, defaultSiteId, enableVisualPreview, maxEntriesPerRelease with Yii2 validation
-- `Release` — id, siteId, name, description, status, scheduledDate, publishedDate, publishedBy, createdBy, private `_entries` array with getEntries()/setEntries()/getEntryCount()
-- `ReleaseEntry` — id, releaseId, canonicalId, draftId (nullable), sortOrder, status (pending/published/failed), errorMessage
-- `FieldDiff` — handle, label, type, oldValue, newValue, diffHtml, hasChanges
-
-**2 ActiveRecord classes**
-- `ReleaseRecord` — `{{%peek_releases}}`
-- `ReleaseEntryRecord` — `{{%peek_release_entries}}`
-
-**Install migration**
-- Creates 2 tables with indexes and foreign keys
-- `draftId` FK uses **SET NULL** (not CASCADE) — critical because `applyDraft()` deletes the draft element, and release_entry rows must survive
-- Unique index on `[releaseId, draftId]` prevents duplicate entries
-
-**CSS/JS assets**
-- `CpAsset.php` + `peek.css` — dashboard cards, summary stats, release actions, status badges, toolbar layout
-- `peek.js` — tab switching, confirm dialogs
-- `DiffAsset.php` + `diff.css` — field diff blocks (expand/collapse), SideBySide table styling, simple diff, boolean diff, visual preview iframes
-- `diff.js` — tab switching between Field Diff and Visual Preview, synchronized iframe scrolling
-
-**Translations**
-- `translations/en/peek.php` — 70+ strings covering all UI text
-
----
-
-## Phase 2: Draft Service & Dashboard — COMPLETE
-
-### What was built
-
-**DraftService** — queries pending drafts site-wide:
-- `getAllPendingDrafts(?siteId)` — `Entry::find()->drafts(true)->provisionalDrafts(false)->draftOf('*')`
-- `getDraftCountsBySection(?siteId)` — groups drafts by section name, sorted descending
-- `getStaleDrafts(days, ?siteId)` — drafts not updated in N days
-
-**DashboardController** — renders dashboard with:
-- Summary cards: pending draft count, stale draft count, active release count
-- Drafts by section table
-- Pending drafts table: title (linked to CP edit), section, author (via `draft.getCreator().friendlyName`), last updated date, Diff button
-
----
-
-## Phase 3: Diff Engine (Field + Preview) — COMPLETE
-
-### What was built
-
-**DiffService** — field-by-field comparison using `jfcherng/php-diff`:
-- `diffEntry(draft, canonical)` → array of FieldDiff objects
-- Compares native attributes: title, slug, enabled (boolean diff)
-- Custom field handling by type:
-  - PlainText — direct string diff
-  - CKEditor/rich text — `strip_tags()` then diff
-  - Lightswitch — boolean "On/Off" diff rendering
-  - Date — `Y-m-d H:i:s` format diff
-  - Color, Email, Link — string diff
-  - Entries/Categories/Users relations — `"Title (#id)"` per line
-  - Assets — `"filename.ext (#id)"` per line
-  - Matrix/arrays — JSON pretty-print diff
-- `getPreviewUrls(draft, canonical)` — returns URLs for iframe preview
-- `_renderTextDiff()` — `DiffHelper::calculate()` with SideBySide renderer, word-level detail
-- `_renderBooleanDiff()` — styled On/Off with red→green transition
-
-**DiffController** — `actionView(draftId)` and `actionPreview(draftId)`:
-- Loads draft via `Entry::find()->id()->drafts(true)->status(null)->one()`
-- Gets canonical via `$draft->getCanonical()`
-- Renders field diffs and preview URLs
-
-**Templates:**
-- `diff/_view.twig` — header (title, draft ID, changed count, edit link), tab toggle (Field Diff / Visual Preview), field diff list, dual iframe preview
-- `diff/_field-diff.twig` — individual field block (collapsible, changed/unchanged badge, diff HTML or simple diff fallback)
-- `diff/_preview.twig` — standalone preview page with two iframes
-
----
-
-## Phase 4: Release Management — COMPLETE
-
-### What was built
-
-**Releases service** — full CRUD + atomic publish:
-- `getReleaseById()`, `getAllReleases(?siteId)`, `saveRelease()`, `deleteRelease()`
-- `addEntryToRelease(releaseId, canonicalId, draftId)` — with duplicate check and maxEntriesPerRelease limit
-- `removeEntryFromRelease(releaseId, draftId)`
-- `validateRelease(release)` — validates all drafts/canonicals still exist
-- `publishRelease(release)` — DB transaction wrapping `Craft::$app->getDrafts()->applyDraft()` for each entry. All succeed or none do. Marks entries as published, sets release status to Published with timestamp.
-- `getReleaseEntryRecordsByDraftId()`, `markEntryPublishedByDraftId()`, `removeEntryByDraftId()`, `getReleasesForDraft()` — helper methods for event listener integration
-
-**ReleasesController** — full HTTP CRUD:
-- `actionIndex()` — lists all releases
-- `actionEdit(?releaseId)` — create/edit form with resolved entry details (titles, sections, status badges)
-- `actionSave()` — creates or updates release from POST
-- `actionPublish()` — triggers atomic publish (requires `peek:publishReleases` permission)
-- `actionDelete()` — deletes release (requires `peek:deleteReleases`)
-- `actionAddEntry()`, `actionRemoveEntry()` — manages release entries via POST
-
-**Templates:**
-- `releases/_index.twig` — table with name, status (color badge), entry count, scheduled date, created date. "New Release" button, empty state.
-- `releases/_edit.twig` — form with name, description, status dropdown, scheduled date. Entries table showing resolved titles with CP edit links, section names, status badges (green=published, red=failed, grey=pending), Diff and Remove buttons. Publish Now / Delete actions. "Published on {date}" info for completed releases.
-
----
-
-## Phase 5: Scheduling & Queue — COMPLETE
-
-### What was built
-
-**PublishReleaseJob** — extends `BaseJob`:
-- Takes `releaseId`, calls `publishRelease()`, throws `RuntimeException` on failure for queue retry
-- `defaultDescription()` for queue UI
-
-**SchedulerController** — console command `peek/scheduler/check`:
-- Queries `ReleaseRecord` for `status=scheduled` with `scheduledDate <= now`
-- Pushes `PublishReleaseJob` to Craft queue for each
-- Marks release as "publishing" to prevent re-pickup
-- Designed for cron: `* * * * * /path/to/craft peek/scheduler/check`
-
-**ReleasesController (console)** — `peek/releases/list|status|publish` for deploy pipelines (added 2026-10-09):
-- `list` (`--status`, `--site`, `--json`), `status <id>` (exit 1 when Failed or `validateRelease()` finds problems), `publish <id>` (`--as`, `--dry-run`/`-n`, `--json`)
-- `publish` runs as the system (`publishRelease($release, null)`, trusted) unless `--as` names an active user with `peek:publishReleases`; then it's `publishRelease($release, $user)`, which re-checks every draft. Refuses Published and Publishing (the queue owns it)
-- Tested for real in `tests/harness/console.php` (shells out to `php craft`)
-
----
-
-## Phase 6: Entry Editor Integration & Events — COMPLETE
-
-### What was built
-
-**3 event listeners in Plugin.php:**
-
-1. `Drafts::EVENT_BEFORE_APPLY_DRAFT` — marks release entries as published by draftId and tracks the ID in `_applyingDraftIds[]`. Must happen BEFORE apply because the FK SET NULL clears draftId during the draft element deletion.
-
-2. `Drafts::EVENT_AFTER_APPLY_DRAFT` — cleans up `_applyingDraftIds[]` tracking array.
-
-3. `Elements::EVENT_BEFORE_DELETE_ELEMENT` — when a draft Entry is truly deleted (not applied), removes it from all releases. Skips if the draft ID is in `_applyingDraftIds[]` (being applied, not deleted).
-
-**Sidebar HTML injection:**
-- `Entry::EVENT_DEFINE_SIDEBAR_HTML` — on non-provisional draft entries in CP
-- `_renderPeekSidebar(Entry $draft)` — shows:
-  - Fields Changed count (via `diffEntry()`)
-  - "View Diff" link to `peek/diff/{draftId}`
-  - Release membership with links and status dots
-
-### Critical design decision
-
-**FK SET NULL pattern:** When `applyDraft()` is called, Craft internally deletes the draft element. If draftId FK used CASCADE, the `peek_release_entries` row would be deleted at the DB level before any PHP event could mark it as "published." Solution: FK uses SET NULL, draftId is nullable, and the BEFORE_APPLY event marks the entry before deletion occurs.
-
----
-
-## Phase 7: Polish & Store Prep — COMPLETE
-
-### What was done
-
-- **CSS polish** — auto-collapsed unchanged fields, diff block borders, status badges, release entry layout
-- **Error handling** — maxEntriesPerRelease validation, enriched release edit with resolved entry titles/sections
-- **Translations** — all 70+ strings in `en/peek.php`
-- **Package files** — composer.json with full Plugin Store metadata, README.md, CHANGELOG.md, LICENSE.md (proprietary)
-- **Smoke tests** — all 6 CP pages verified (Dashboard, Releases index, New Release, Settings, Diff view, Release edit)
-
----
-
-## CP Routes
-
-```
-peek                              → dashboard/index
-peek/releases                     → releases/index
-peek/releases/new                 → releases/edit
-peek/releases/<releaseId:\d+>     → releases/edit
-peek/diff/<draftId:\d+>           → diff/view
-peek/diff/<draftId:\d+>/preview   → diff/preview
-peek/settings                     → settings/index
-```
-
-## Permissions
-
-```
-peek:accessPlugin — top-level access
-  ├── peek:viewDiffs
-  └── peek:manageReleases
-        ├── peek:publishReleases
-        ├── peek:scheduleReleases
-        └── peek:deleteReleases
-peek:manageSettings
-```
-
-## Database Tables
-
-### `{{%peek_releases}}`
-id, siteId (FK→sites CASCADE), name, description, status, scheduledDate, publishedDate, publishedBy (FK→users SET NULL), createdBy (FK→users SET NULL), dateCreated, dateUpdated, uid
-
-### `{{%peek_release_entries}}`
-id, releaseId (FK→releases CASCADE), canonicalId (FK→elements CASCADE), draftId (FK→elements **SET NULL**), sortOrder, status, errorMessage, dateCreated, dateUpdated, uid
-
-Indexes: status + scheduledDate + siteId on releases; releaseId + unique [releaseId, draftId] on release_entries
-
----
-
-## File Inventory (40 source files)
+## Layout
 
 ```
 src/
-├── Plugin.php
-├── config.php
-├── icon.svg
-├── enums/
-│   └── ReleaseStatus.php
-├── models/
-│   ├── Settings.php
-│   ├── Release.php
-│   ├── ReleaseEntry.php
-│   └── FieldDiff.php
-├── records/
-│   ├── ReleaseRecord.php
-│   └── ReleaseEntryRecord.php
-├── services/
-│   ├── Releases.php
-│   ├── DiffService.php
-│   └── DraftService.php
-├── controllers/
-│   ├── DashboardController.php
-│   ├── ReleasesController.php
-│   ├── DiffController.php
-│   └── SettingsController.php
-├── console/controllers/
-│   ├── ReleasesController.php
-│   └── SchedulerController.php
-├── queue/jobs/
-│   └── PublishReleaseJob.php
-├── migrations/
-│   └── Install.php
-├── templates/
-│   ├── _layouts/plugin.twig
-│   ├── dashboard/_index.twig
-│   ├── releases/_index.twig
-│   ├── releases/_edit.twig
-│   ├── diff/_view.twig
-│   ├── diff/_field-diff.twig
-│   ├── diff/_preview.twig
-│   └── settings/_index.twig
-├── translations/en/
-│   └── peek.php
-└── web/assets/
-    ├── cp/
-    │   ├── CpAsset.php
-    │   └── dist/
-    │       ├── css/peek.css
-    │       └── js/peek.js
-    └── diff/
-        ├── DiffAsset.php
-        └── dist/
-            ├── css/diff.css
-            └── js/diff.js
+├── Plugin.php                 # $events, $commands, $styles/$scripts, schedule(), permissions, nav, settingsUi()
+├── Console/Commands/          # peek:releases:list|status|publish, peek:scheduler:check, peek:releases:move-to-craft
+├── Data/                      # FieldDiff, ReleaseSummary (a release from either system)
+├── Database/Tables.php
+├── Enums/ReleaseStatus.php
+├── Events/PeekReleasePublished.php
+├── Http/Controllers/          # Dashboard (invokable), Diff, Releases, DraftReleases (sidebar's "Add to a release…")
+├── Jobs/PublishRelease.php
+├── Listeners/                 # TrackAppliedDraft, RemoveDiscardedDraft, AddEditorMetadata
+├── Models/                    # Release, ReleaseEntry (Eloquent, CraftCms\Cms\Shared\BaseModel), Settings
+└── Services/                  # Diff, PendingDrafts, Releases (Peek's own), ReleaseSystem (picks Peek's or Craft's)
+routes/cp.php · database/migrations/Install.php · resources/{templates,css,js} · lang/en/peek.php
+tests/  Pest on PluginTestCase (real Craft 6 + Peek on in-memory SQLite)
 ```
 
----
+## Key decisions
 
-## Key Technical Decisions
-
-1. **Atomic publish via DB transaction** — all drafts in a release are applied within a single `beginTransaction()`/`commit()`. If any draft fails, the entire transaction rolls back and the release is marked "failed."
-
-2. **FK SET NULL on draftId** — `applyDraft()` deletes the draft element at the DB level. CASCADE would destroy the release_entry row. SET NULL preserves it, and the BEFORE_APPLY event marks it "published" before deletion.
-
-3. **`_applyingDraftIds` guard** — prevents the `BEFORE_DELETE_ELEMENT` handler from removing release entries for drafts being applied (as opposed to drafts genuinely deleted by the user).
-
-4. **`jfcherng/php-diff` SideBySide renderer** — word-level diff with 3 lines of context. CKEditor content is stripped of HTML before diffing. Relations are serialized to `"Title (#id)"` per line.
-
-5. **Cron-based scheduling** — `peek/scheduler/check` runs every minute, queries overdue scheduled releases, pushes `PublishReleaseJob` to Craft's queue. The job is processed by `craft queue/run` or Craft's queue listener.
-
-6. **Releases act as a person (5.0.4)** — every draft is checked with `Elements::canSave($draft)` + `canSaveCanonical($draft)`, the same pair Craft's `elements/apply-draft` checks: when it's added, and again at publish (`publishRelease($release, $user)`). The queue job publishes as `scheduledBy` (fallback `createdBy`), re-checking their current permissions and `peek:scheduleReleases`. Calling the service with no user is trusted code.
-
-7. **The release screen is one form** — `fullPageForm`, so every secondary action is a `.formsubmit` button with `data-action`/`data-params`. Never nest a `<form>`: the browser drops it and its `action` input joins the main form, where PHP keeps the last one (that was `delete`, so Save deleted the release).
-
-8. **Dates are UTC** — `Db::prepareDateForDb()` in, `DateTimeHelper::toDateTime()` out, scheduler compares in UTC.
+1. **One release system per site.** Craft 6 Pro/Enterprise ship releases (`CraftCms\Cms\Release`);
+   Solo/Team don't. `ReleaseSystem::usesCraft()` = `Edition::get()->supportsReleases()`. On Pro the
+   sidebar, dashboard and console use Craft's releases; Peek's own rows become "earlier releases":
+   publishable and deletable, no new drafts, `peek:releases:move-to-craft` moves them. Chosen by the
+   user (2026-11-23) over a straight port or dropping releases.
+2. **Peek's diff stays** beside Craft 6's Compare screen (`cp/compare/{id}`), which shows field
+   previews, not a word diff. The diff screen links to it.
+3. **Tables unchanged from 5.x.** `Install.php` skips existing tables. `draftId` is still nullable
+   with ON DELETE SET NULL, and `TrackAppliedDraft` marks rows published on `DraftApplying`, before
+   the apply deletes the draft element (Craft 6 still hard-deletes it).
+4. **Every publish acts as a person.** `canApply()` = `can('save', $draft) && can('saveCanonical', $draft)`,
+   the pair Craft 6's apply-draft action checks. No user = trusted (console system publish, tests).
+5. **Draft IDs.** Peek stores the draft *element* ID. Craft's release items store `drafts.id`
+   (`$draft->draftId`). `ReleaseSummary::$entries[].draftId` is always the element ID.
+6. **Sidebar = `ElementMetadataResolving`.** Craft 6's Inertia editor has no sidebar-HTML hook.
+   Values are closures returning HTML, computed only when drawn; the count re-fetches the saved draft.
+7. **Diff of container fields.** `ElementContainerFieldInterface` (Matrix, Content Block) is serialized
+   by content (`#n Type`, title, field values), always queried fresh from the owner with
+   `status(null)`, never by nested-entry ID (5.1.2, issue #3).
 
 ## Traps
 
-- **Craft 5.11 added a static `Controller::currentUser()`.** A private instance method of that name is a fatal on load ("Cannot make static method … non static"); Peek's own vendor Craft (5.10) doesn't have it, so only the harness caught it.
-- **`getSection()` throws on a draft whose section is gone.** List code filters those out.
-- **`Model::validate()` clears errors**, so `saveRelease()` after `addErrors()` loses them — add errors after saving.
-- **A draft's `getUrl()` is the live page.** It shares its entry's URI; only a preview token (`Tokens::createPreviewToken(['preview/preview', [... 'draftId' => …]])`) renders the draft. Visual Preview's Draft pane used the plain URL until 5.1.1 (issue #2)
-- **Matrix blocks can't be compared by ID.** A draft gets its own copy of every block it edits (new ID, same content), so `_nestedEntriesToString()` serializes blocks by type + field values, queried fresh from the owner with `status(null)`. ID-based diffing showed `(#id)` lines and false changes until 5.1.2 (issue #3)
-- **The entry editor's element isn't the saved draft.** Its field values can be eager-loaded `ElementCollection`s or preloaded Matrix sets. The sidebar re-fetches the draft before diffing so its count matches the diff page (issue #3)
-- **Opening an outdated draft in the editor saves it.** Craft's `ElementsController::actionEdit` runs `mergeCanonicalChanges()`, bumping `dateUpdated`, which moves the draft up Craft's drafts menu and resets Peek's stale-draft age. Core behaviour, not Peek's
-- **Third-party field values can be any object.** SEOmatic returns a `MetaBundle` model with no `__toString()` (issue #1). `_fieldValueToString()` must never cast an unknown object to string; models go through `toArray()`, the rest through JSON, and `diffEntry()` catches per field.
+- **`-n` is `--no-interaction` in Laravel.** 5.x used it for `--dry-run`. Under the 5.x name
+  (`peek/releases/publish … -n`, read from raw argv) it stays a dry run, or a 5.x script would publish.
+- **Command aliases resolve as `craft:<alias>`.** `php craft peek/scheduler/check` works; in tests call
+  `$this->artisan('craft:peek/scheduler/check')`.
+- **Craft's releases always publish as a user** (`Releases::publish($release, $actor)`); a console
+  publish of one needs `--as`. `checkReadiness()` also needs a user with Manage/Publish releases.
+- **Solo allows one user.** Tests run on Team (`TestCase::setUp`). On Team every non-admin shares the
+  Team group's permissions; per-user permissions are Pro (`saveUserPermissions` throws on Team).
+- **SQLite ignores foreign keys unless asked**, and the pragma is ignored inside a transaction:
+  `TestCase::beginDatabaseTransaction()` turns it on first, or SET NULL never fires.
+- **Querying UTC dates:** `BaseModel` converts model attributes, but `->where('scheduledDate', '<=', now())`
+  doesn't. Use `Query::prepareDateForDb(now())`.
+- **Install.php is already loaded** once the plugin is installed; `require` it again and PHP fatals.
+- **Opening an outdated draft in Craft's editor saves it** (canonical changes merged), bumping its
+  date. Explains "the draft changed but nobody edited it" (issue #3, 2026-11).
+- **CP JS loads on every page, in `<head>`, before Vue.** Delegate from `document`; Inertia swaps the
+  content. No jQuery, no `Craft.*` helpers.
 
 ## Testing
 
 ```sh
-# Codeception (unit + integration) from the PHP 8.4 runner, against a throwaway DB on the harness MySQL
-docker exec ddev-plugin-testing-db mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS craft_peek_test"
-docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 160 tests
-
-# Controllers and screens over HTTP, in the plugin-testing harness
-docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/security.php   # 19 checks
-
-# Console commands, run for real (`php craft peek/releases/*` as child processes), in the harness
-docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/console.php    # 15 checks
+# In the Craft 6 harness container (PHP 8.5), from the worktree:
+docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pest      # 62 tests
+docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/pint --test
+docker exec -w /var/www/ports/craft-peek ddev-plugin-testing-craft6-web vendor/bin/phpstan analyse --memory-limit=1G   # level 6
+~/Sites/plugin-testing-craft6/bin/port-check craft-peek
 ```
+
+Pest runs a real Craft 6 install with Peek on in-memory SQLite, so it doesn't touch the shared
+harness database. Live checks in the harness (`bin/cp-session` + curl, `php craft peek/...`): the
+harness is Craft **Pro**, so it exercises the Craft-releases path; make your own content and delete it.

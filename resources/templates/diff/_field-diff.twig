@@ -1,0 +1,25 @@
+<div class="peek-field-diff {{ diff.error ? 'has-error' : (diff.hasChanges ? 'has-changes' : 'no-changes') }}">
+    <button type="button" class="peek-field-diff-header" aria-expanded="{{ diff.hasChanges ? 'true' : 'false' }}">
+        <strong>{{ diff.label }}</strong>
+        <span class="peek-field-handle">{{ diff.handle }}</span>
+        {% if diff.error %}
+            <span class="peek-dot peek-dot--gray" title="{{ diff.error }}"></span>
+        {% elseif diff.hasChanges %}
+            <span class="peek-dot peek-dot--yellow" title="{{ 'Changed'|t('peek') }}"></span>
+        {% else %}
+            <span class="peek-dot peek-dot--green" title="{{ 'Unchanged'|t('peek') }}"></span>
+        {% endif %}
+    </button>
+    {% if diff.error %}
+        <div class="peek-field-diff-body"><p class="peek-light">{{ diff.error }}</p></div>
+    {% elseif diff.hasChanges and diff.diffHtml %}
+        <div class="peek-field-diff-body">{{ diff.diffHtml|raw }}</div>
+    {% elseif diff.hasChanges %}
+        <div class="peek-field-diff-body">
+            <div class="peek-simple-diff">
+                <div class="peek-diff-removed">{{ diff.oldValue }}</div>
+                <div class="peek-diff-added">{{ diff.newValue }}</div>
+            </div>
+        </div>
+    {% endif %}
+</div>

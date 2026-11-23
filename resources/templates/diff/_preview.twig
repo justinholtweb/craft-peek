@@ -1,0 +1,5 @@
+{% if previewUrls.canonical and previewUrls.draft %}
+    {% include 'peek/diff/_panes' with { previewUrls: previewUrls } only %}
+{% else %}
+    <p class="peek-empty">{{ 'This entry has no page to preview.'|t('peek') }}</p>
+{% endif %}

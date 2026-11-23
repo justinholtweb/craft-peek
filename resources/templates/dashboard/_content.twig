@@ -1,0 +1,65 @@
+<div class="peek-dashboard">
+    <div class="peek-summary">
+        <div class="peek-card">
+            <h2>{{ 'Pending drafts'|t('peek') }}</h2>
+            <div class="peek-stat-value">{{ drafts|length }}</div>
+        </div>
+        <div class="peek-card">
+            <h2>{{ 'Stale drafts'|t('peek') }}</h2>
+            <div class="peek-stat-value peek-stat--warning">{{ staleCount }}</div>
+            <div class="peek-stat-label">{{ 'No save in {days} days'|t('peek', { days: staleDraftDays }) }}</div>
+        </div>
+        {% if activeReleases is not null %}
+            <div class="peek-card">
+                <h2>{{ 'Active releases'|t('peek') }}</h2>
+                <div class="peek-stat-value"><a href="{{ releasesUrl }}">{{ activeReleases }}</a></div>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if countsBySection|length %}
+        <section class="peek-section">
+            <h2>{{ 'Drafts by section'|t('peek') }}</h2>
+            <table class="peek-table">
+                <thead><tr><th>{{ 'Section'|t('peek') }}</th><th>{{ 'Drafts'|t('peek') }}</th></tr></thead>
+                <tbody>
+                    {% for section, count in countsBySection %}
+                        <tr><td>{{ section }}</td><td>{{ count }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+
+    {% if drafts|length %}
+        <section class="peek-section">
+            <h2>{{ 'Pending drafts'|t('peek') }}</h2>
+            <table class="peek-table">
+                <thead>
+                    <tr>
+                        <th>{{ 'Title'|t('peek') }}</th>
+                        <th>{{ 'Section'|t('peek') }}</th>
+                        <th>{{ 'Created by'|t('peek') }}</th>
+                        <th>{{ 'Last saved'|t('peek') }}</th>
+                        {% if canViewDiffs %}<th></th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for draft in drafts %}
+                        <tr>
+                            <td><a href="{{ draft.getCpEditUrl() }}">{{ draft.title }}</a> <span class="peek-light">{{ draft.draftName }}</span></td>
+                            <td>{{ draft.getSection().name ?? '—' }}</td>
+                            <td>{{ draft.getCreator().getFriendlyName() ?? '—' }}</td>
+                            <td>{{ draft.dateUpdated|datetime('short') }}</td>
+                            {% if canViewDiffs %}
+                                <td class="peek-thin"><a class="peek-btn" href="{{ diffBaseUrl ~ '/' ~ draft.id ~ '?siteId=' ~ draft.siteId }}">{{ 'Diff'|t('peek') }}</a></td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% else %}
+        <p class="peek-empty">{{ 'No pending drafts.'|t('peek') }}</p>
+    {% endif %}
+</div>

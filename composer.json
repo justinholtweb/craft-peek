@@ -1,67 +1,82 @@
 {
     "name": "justinholtweb/craft-peek",
     "description": "Content staging, visual diff, and coordinated releases for Craft CMS.",
-    "version": "5.1.2",
+    "version": "6.0.0-beta.1",
     "type": "craft-plugin",
+    "keywords": [
+        "craft",
+        "cms",
+        "craftcms",
+        "craft-plugin",
+        "drafts",
+        "diff",
+        "releases",
+        "content-staging",
+        "laravel"
+    ],
     "license": "proprietary",
-    "minimum-stability": "dev",
+    "minimum-stability": "beta",
     "prefer-stable": true,
+    "authors": [
+        {
+            "name": "Justin Holt",
+            "homepage": "https://github.com/justinholtweb"
+        }
+    ],
+    "support": {
+        "email": "justin@justinholtweb.com",
+        "issues": "https://github.com/justinholtweb/craft-peek/issues",
+        "source": "https://github.com/justinholtweb/craft-peek",
+        "docs": "https://github.com/justinholtweb/craft-peek/blob/6.0.0/README.md"
+    },
     "require": {
-        "php": "^8.2",
-        "craftcms/cms": "^5.0.0",
+        "php": "^8.5",
+        "craftcms/cms": "^6.0.0-beta.1",
         "jfcherng/php-diff": "^6.0"
     },
     "require-dev": {
-        "codeception/codeception": "^5.0",
-        "craftcms/ecs": "dev-main",
-        "craftcms/phpstan": "dev-main",
-        "codeception/module-yii2": "^1.1",
-        "codeception/module-asserts": "^3.0",
-        "codeception/module-datafactory": "^3.0",
-        "vlucas/phpdotenv": "^5.4",
-        "phpstan/phpstan": "^1.12 || ^2.2"
+        "larastan/larastan": "^3.13",
+        "laravel/pint": "^1.22",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.0",
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "phpstan/phpstan": "^2.1"
     },
     "autoload": {
         "psr-4": {
-            "justinholtweb\\peek\\": "src/"
+            "JustinHoltWeb\\Peek\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "justinholtweb\\peek\\tests\\": "tests/"
+            "JustinHoltWeb\\Peek\\Tests\\": "tests/"
         }
     },
     "scripts": {
-        "test": "codecept run",
-        "test-unit": "codecept run unit",
-        "test-integration": "codecept run integration",
-        "ecs": "ecs check",
-        "ecs-fix": "ecs check --fix",
-        "phpstan": "phpstan analyse"
+        "test": "pest",
+        "phpstan": "phpstan analyse --memory-limit=1G",
+        "check-cs": "pint --test",
+        "fix-cs": "pint"
     },
     "config": {
         "allow-plugins": {
             "craftcms/plugin-installer": true,
-            "yiisoft/yii2-composer": true
-        }
-    },
-    "support": {
-        "email": "justin@justinholtweb.com",
-        "issues": "https://github.com/justinholtweb/craft-peek/issues",
-        "docs": "https://github.com/justinholtweb/craft-peek/blob/main/README.md"
+            "pestphp/pest-plugin": true
+        },
+        "platform": {
+            "php": "8.5"
+        },
+        "sort-packages": true
     },
     "extra": {
-        "handle": "peek",
         "name": "Peek",
-        "developer": "justinholtweb",
+        "handle": "peek",
+        "developer": "Justin Holt",
         "developerUrl": "https://justinholt.com",
         "developerEmail": "justin@justinholtweb.com",
-        "documentationUrl": "https://github.com/justinholtweb/craft-peek",
-        "changelogUrl": "https://raw.githubusercontent.com/justinholtweb/craft-peek/main/CHANGELOG.md",
         "description": "Content staging, visual diff, and coordinated releases for Craft CMS.",
-        "class": "justinholtweb\\peek\\Plugin",
-        "schemaVersion": "1.0.0",
-        "hasCpSettings": true,
-        "hasCpSection": true
+        "documentationUrl": "https://github.com/justinholtweb/craft-peek/blob/6.0.0/README.md",
+        "changelogUrl": "https://raw.githubusercontent.com/justinholtweb/craft-peek/6.0.0/CHANGELOG.md",
+        "class": "JustinHoltWeb\\Peek\\Plugin"
     }
 }

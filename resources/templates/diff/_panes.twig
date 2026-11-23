@@ -1,0 +1,10 @@
+<div class="peek-preview-container" data-peek-preview>
+    <div class="peek-preview-pane">
+        <h3>{{ 'Live'|t('peek') }}</h3>
+        <iframe src="{{ previewUrls.canonical }}" class="peek-preview-iframe" data-peek-iframe="canonical" title="{{ 'Live page'|t('peek') }}"></iframe>
+    </div>
+    <div class="peek-preview-pane">
+        <h3>{{ 'Draft'|t('peek') }}</h3>
+        <iframe src="{{ previewUrls.draft }}" class="peek-preview-iframe" data-peek-iframe="draft" title="{{ 'Draft preview'|t('peek') }}"></iframe>
+    </div>
+</div>
