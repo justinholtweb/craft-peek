@@ -10,6 +10,9 @@ Peek gives editorial teams field-by-field diff comparison, side-by-side visual p
 - **Scheduled Publishing** — Set a future date and let Peek auto-publish via cron
 - **Dashboard** — Overview of pending drafts, stale drafts, and active releases across the site
 - **Entry Sidebar** — See changed field count, diff link and release membership in the draft editor, and add the draft to a release from there
+- **MCP tools** — AI agents can list drafts, read diffs, and check, fill and publish releases through Craft's MCP server (Craft 5.12.1+), with the agent user's own permissions
+- **GraphQL** — Read-only queries for drafts, diffs and releases, scoped by the schema's sections and sites
+- **Custom nav item** — Rename Peek's control panel nav item and give it any icon
 
 ## Requirements
 
@@ -57,6 +60,70 @@ php craft peek/releases/publish 12 --as=jane@example.com
 > instead: they need the Publish releases permission, and every draft must be one they could apply
 > in Craft's editor, or nothing is published. The user is recorded as the publisher.
 
+## MCP (AI agents)
+
+On **Craft 5.12.1 or later**, Peek adds six tools to Craft's MCP server. On older Craft 5 releases
+there's no MCP server, and Peek works as before without them.
+
+| Tool | Does | Permission | Read-only |
+|---|---|---|---|
+| `peek_drafts_list` | Saved drafts waiting to be applied, newest first — the dashboard's list (`staleOnly`, `siteId`, `limit` 1–100, `offset`) | Access Peek | ✓ |
+| `peek_draft_diff` | A draft compared with its entry, field by field, as plain text (`draftId` is the draft's element ID; `siteId`, `includeUnchanged`) | View diffs | ✓ |
+| `peek_releases_list` | Releases, newest first (`status`) | Manage releases | ✓ |
+| `peek_release_get` | One release with its entries and anything that would stop you publishing it | Manage releases | ✓ |
+| `peek_release_add_draft` | Adds a draft to a release | Manage releases | |
+| `peek_release_publish` | Publishes a release now, all or nothing (`dryRun` to check first) | Manage releases + Publish releases | |
+
+Every tool also needs control panel access and acts as the MCP user, with the same checks as the
+control panel: only drafts that user could open (view rights and, on multi-site installs, the site)
+are listed or diffed, a draft's title is only shown to someone who could open it, and adding or
+publishing a draft needs the rights to apply it in Craft's editor. **Publishing through MCP always
+runs as the agent's user, never as the system** — unlike `php craft peek/releases/publish` without
+`--as`.
+
+To use them, turn on Craft's MCP server under **Settings → MCP** and connect your agent with a token
+for a user who has Peek's permissions. The two write tools need the token's `mcp:write` scope; the
+rest need `mcp:read`. To try them locally without a token, run Craft's stdio server as a user:
+
+```bash
+php craft mcp/serve --user=admin
+```
+
+## GraphQL
+
+Peek adds read-only queries for drafts, their diffs and releases. In a GraphQL schema, under
+**Peek**, turn on:
+
+- **Query drafts and their diffs (peekDrafts, peekDraftDiff)** — `peekDrafts:read`. The schema also
+  needs Craft's own **Query for element drafts** option.
+- **Query releases (peekReleases, peekRelease)** — `peekReleases:read`.
+
+```graphql
+{
+  peekDrafts(staleOnly: false, limit: 20) { id draftId canonicalId title draftName sectionHandle siteHandle dateUpdated stale }
+  peekDraftDiff(draftId: 1234, includeUnchanged: false) {
+    changedCount
+    draft { title }
+    fields { handle label type changed oldValue newValue error }
+  }
+  peekReleases(status: "scheduled") { id name status siteHandle entryCount scheduledDate }
+  peekRelease(id: 12) { name status publishedDate entries { canonicalId draftId status } }
+}
+```
+
+Drafts are unpublished content, so:
+
+- **The public schema never gets anything** from Peek's queries — `null` or an empty list, whatever
+  its scopes. Use a token with its own schema.
+- Drafts and diffs are only returned for entries in sections (and sites) the schema can read; any
+  other draft is left out of `peekDrafts`, and `peekDraftDiff` returns `null` for it.
+- Releases on a site the schema can't read are left out. A release's `entries` and `entryCount`
+  include only entries the schema could read.
+- Without the matching scope, the queries aren't in the schema at all.
+
+Field values are the text Peek compares (rich text without its HTML, relations as `Title (#id)`
+lines); booleans, such as `enabled`, are `On` or `Off`. There are no mutations.
+
 ## Permissions
 
 | Permission | Description |
@@ -72,7 +139,9 @@ php craft peek/releases/publish 12 --as=jane@example.com
 Peek's permissions decide which Peek screens someone can use; Craft's entry permissions still decide
 which drafts:
 
-- **Diffs** need the right to view the draft and its entry.
+- **The dashboard** lists only drafts the viewer could open in Craft's editor — view rights and, on
+  multi-site installs, the Edit site permission for the draft's site.
+- **Diffs** need the right to view the draft and its entry (and, on multi-site installs, its site).
 - **Adding a draft** to a release, and **publishing** it, need what Craft's editor needs to apply
   that draft — saving the draft and saving its entry. If the publisher can't apply any one draft,
   nothing in the release is published.
@@ -90,5 +159,22 @@ return [
     'defaultSiteId' => null,
     'enableVisualPreview' => true,
     'maxEntriesPerRelease' => 50,
+    'navLabel' => null,
+    'navIcon' => null,
+    'navIconSvg' => null,
 ];
 ```
+
+### Control panel nav item
+
+Peek's nav item can be renamed and given another icon under **Peek → Settings → Navigation**, or in
+the config file:
+
+- `navLabel` — the label, up to 64 characters. Empty is “Peek”.
+- `navIcon` — an icon name from Craft's icon picker, such as `eye`.
+- `navIconSvg` — your own icon, as a single `<svg>` element (up to 50 KB). It wins over `navIcon`,
+  and it's sanitized every time it's drawn: scripts, event handlers and external references are
+  removed.
+
+The SVG wins over the icon name, which wins over Peek's own icon. A control panel navigation plugin
+that customizes Peek's item overrides these.

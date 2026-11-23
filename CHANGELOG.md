@@ -40,6 +40,17 @@ Craft, and see [the upgrade guide](https://github.com/justinholtweb/craft-peek/b
 
 - Categories fields: Craft 6 has no categories.
 
+## 5.2.0 - 2026-11-23
+
+### Added
+- MCP tools for AI agents, on Craft 5.12.1 and later: `peek_drafts_list`, `peek_draft_diff`, `peek_releases_list`, `peek_release_get`, `peek_release_add_draft` and `peek_release_publish`. They act as the agent's user, with the same checks as the control panel, and publishing through MCP always runs as that user. On older Craft 5 releases Peek works as before
+- GraphQL queries `peekDrafts`, `peekDraftDiff`, `peekReleases` and `peekRelease`, behind the new schema options under Peek. Read-only, never on the public schema, and only for entries in sections and sites the schema can read; drafts also need Craft's “Query for element drafts” option
+- Peek's control panel nav item can be renamed and given an icon from Craft's icon picker or your own SVG (`navLabel`, `navIcon`, `navIconSvg`), under Peek → Settings or in `config/peek.php`
+
+### Security
+- On multi-site installs, the dashboard and the release screen listed drafts in sites the viewer had no access to. They now need the same Edit site permission as Craft's entry editor, like the diff screen since 5.1.2
+- A refused publish named every draft the publisher couldn't apply, including ones they couldn't view. Those are now named by entry number
+
 ## 5.1.2 - 2026-11-23
 
 ### Security

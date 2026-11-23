@@ -5,7 +5,7 @@
 Peek is a content staging and visual diff plugin for Craft CMS 5. Single paid edition. Three core features — Field Diff, Releases, and Dashboard — give editorial teams coordinated multi-entry publishing with side-by-side comparison.
 
 **Namespace:** `justinholtweb\peek`
-**Craft CMS:** ^5.0.0 | **PHP:** ^8.2
+**Craft CMS:** ^5.0.0 (MCP tools on 5.12.1+) | **PHP:** ^8.2
 **Dependencies:** `jfcherng/php-diff` ^6.0
 **Pattern source:** `/Users/jholt/Sites/craft-garrison/` (Plugin.php, Migration, Enum, Record patterns)
 **Craft 6:** the `6.0.0` branch (6.0.0-beta.1), a worktree at `~/Sites/craft6-ports/craft-peek` with its own `agents.md`. Fixes for both go here first. The changelog is shared: both branches list both release lines.
@@ -183,6 +183,23 @@ Peek is a content staging and visual diff plugin for Craft CMS 5. Single paid ed
 
 ---
 
+## Phase 8: MCP, GraphQL, nav label/icon (5.2.0) — COMPLETE
+
+Same names and shapes as Peek 6 (shared spec); change both or neither.
+
+**MCP** (`src/mcp/DraftTools.php`, `ReleaseTools.php`) — `peek_drafts_list`, `peek_draft_diff`, `peek_releases_list`, `peek_release_get`, `peek_release_add_draft`, `peek_release_publish`:
+- Registered by `Plugin::registerMcp()` only when `Plugin::mcpAvailable()` — Craft **5.12.1+** by version *and* the classes exist. Nothing outside `src/mcp` names an MCP class except that guarded block.
+- Constructor takes only `craft\mcp\McpActor`; services come from `Plugin::getInstance()` (the MCP container would autowire fresh instances).
+- Gates: `#[RequiresPermission]` (accessCp + the Peek permission(s)), re-checked in the handler so a direct call is safe too. Errors are `ToolCallException`; "doesn't exist" and "can't see it" give the same message.
+- Publish always runs as the actor (`publishRelease($release, $user)`); mirrors the console's Published/Publishing refusals.
+- Output shapes in `helpers/Shapes.php` (Draft / FieldDiff / Release). Section and site are handles, `creator` is the creator's friendly name, dates ISO 8601 UTC.
+
+**GraphQL** (`src/gql/`) — scopes `peekDrafts:read`, `peekReleases:read` (group "Peek"); queries in `queries/PeekQueries.php`, resolvers in `resolvers/PeekResolver.php`, access rules in `GqlAccess.php`. Public schema → nothing; drafts also need `elements.drafts:read`; drafts/diffs/release entries only in readable sections + sites; releases on unreadable sites dropped, `entryCount` counts readable entries only.
+
+**Nav** — `navLabel`/`navIcon`/`navIconSvg` on `Settings` (FreeLink's validation; `Settings::iconExists()`, `isSvgMarkup()`), applied in `getCpNavItem()`: SVG (sanitized with `Html::svg()` on every render) > icon name > Peek's icon.
+
+**Shared visibility** — `DraftService::canViewEntry()` (canView + `editSite:` on multi-site) is the one rule for the dashboard, release-screen titles, MCP and `unauthorizedEntries()` titles. `getViewableDraft()` / `canViewDiff()` back DiffController and `peek_draft_diff`.
+
 ## CP Routes
 
 ```
@@ -219,7 +236,7 @@ Indexes: status + scheduledDate + siteId on releases; releaseId + unique [releas
 
 ---
 
-## File Inventory (40 source files)
+## File Inventory
 
 ```
 src/
@@ -236,6 +253,16 @@ src/
 ├── records/
 │   ├── ReleaseRecord.php
 │   └── ReleaseEntryRecord.php
+├── helpers/
+│   └── Shapes.php
+├── mcp/
+│   ├── DraftTools.php
+│   └── ReleaseTools.php
+├── gql/
+│   ├── GqlAccess.php
+│   ├── queries/PeekQueries.php
+│   ├── resolvers/PeekResolver.php
+│   └── types/  (PeekDraft, PeekFieldDiff, PeekDraftDiff, PeekRelease, PeekReleaseEntry)
 ├── services/
 │   ├── Releases.php
 │   ├── DiffService.php
@@ -305,6 +332,10 @@ src/
 - **Matrix blocks can't be compared by ID.** A draft gets its own copy of every block it edits (new ID, same content), so `_nestedEntriesToString()` serializes blocks by type + field values, queried fresh from the owner with `status(null)`. ID-based diffing showed `(#id)` lines and false changes until 5.1.2 (issue #3)
 - **The entry editor's element isn't the saved draft.** Its field values can be eager-loaded `ElementCollection`s or preloaded Matrix sets. The sidebar re-fetches the draft before diffing so its count matches the diff page (issue #3)
 - **Opening an outdated draft in the editor saves it.** Craft's `ElementsController::actionEdit` runs `mergeCanonicalChanges()`, bumping `dateUpdated`, which moves the draft up Craft's drafts menu and resets Peek's stale-draft age. Core behaviour, not Peek's
+- **Peek's dev vendor is Craft 5.10, which has no MCP.** `tests/_stubs/mcp.php` mirrors the 5.12.1 / mcp/sdk 0.9 classes (each declared only if missing); phpstan reads it via `scanFiles`, `McpToolsTest` requires it. The real server is only exercised by `tests/harness/mcp.php`.
+- **MCP `tools/list` is paginated.** Peek's tools aren't on the first page of the harness's list; follow `nextCursor`.
+- **Craft's GraphQL drops unknown fields silently outside debug mode** (it removes the FieldsOnCorrectType rule), so "query not in schema" returns `{"data":[]}`. Test it with `executeQuery(..., debugMode: true)` or the schema's query fields.
+- **The test env's `@appicons` is `src/icons`, not `src/icons/solid`** (TestSetup vs bootstrap). `Settings::iconExists()` checks both.
 - **Third-party field values can be any object.** SEOmatic returns a `MetaBundle` model with no `__toString()` (issue #1). `_fieldValueToString()` must never cast an unknown object to string; models go through `toArray()`, the rest through JSON, and `diffEntry()` catches per field.
 
 ## Testing
@@ -312,11 +343,18 @@ src/
 ```sh
 # Codeception (unit + integration) from the PHP 8.4 runner, against a throwaway DB on the harness MySQL
 docker exec ddev-plugin-testing-db mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS craft_peek_test"
-docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 160 tests
+docker exec -w /sites/craft-peek -e CRAFT_DB_SERVER=ddev-plugin-testing-db -e CRAFT_DB_DATABASE=craft_peek_test ddev-phpstan-runner-web vendor/bin/codecept run   # 203 tests
 
 # Controllers and screens over HTTP, in the plugin-testing harness
 docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/security.php   # 19 checks
 
 # Console commands, run for real (`php craft peek/releases/*` as child processes), in the harness
 docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/console.php    # 15 checks
+
+# MCP tools through Craft 5.12.1's real stdio server (`php craft mcp/serve`), in the harness
+docker exec -w /var/www/html ddev-plugin-testing-web php /var/www/craft-peek/tests/harness/mcp.php        # 16 checks
+
+# Static analysis and style (from the runner)
+docker exec -w /sites/craft-peek ddev-phpstan-runner-web vendor/bin/phpstan analyse --no-progress
+docker exec -w /sites/craft-peek ddev-phpstan-runner-web vendor/bin/ecs check
 ```
