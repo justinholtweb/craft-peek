@@ -370,6 +370,21 @@ GQL);
         $this->assertSame('plain', $redacted('plain'));
         $this->assertStringContainsString('"a": 1', $redacted(['a' => 1]));
         $this->assertSame('[]', $redacted(collect([])), 'An empty collection holds nothing to hide.');
+
+        // Arrays are shown only when every leaf is plain data.
+        $table = [['col1' => 'Apple', 'col2' => 3], ['col1' => 'Pear', 'col2' => null]];
+        $this->assertSame(json_encode($table, JSON_PRETTY_PRINT), $redacted($table));
+        $this->assertStringContainsString('"when": "2026-11-23 10:00:00"', $redacted([['when' => new \DateTime('2026-11-23 10:00:00')]]));
+        $leaky = new class() implements \JsonSerializable {
+            public function jsonSerialize(): mixed
+            {
+                return ['secret' => 'value'];
+            }
+        };
+        $this->assertSame('(not shown over GraphQL)', $redacted([['cell' => $leaky]]));
+        $this->assertSame('(not shown over GraphQL)', $redacted(collect(['a', $leaky])));
+        $this->assertStringNotContainsString('too deep', $redacted([[[[[['too deep']]]]]]), 'Past the depth cap, fail closed.');
+        $this->assertSame('(not shown over GraphQL)', $redacted([[[[['deep', $leaky]]]]]));
         $this->assertSame('2026-11-23 10:00:00', $redacted(new \DateTime('2026-11-23 10:00:00')));
 
         // A third-party object without elements still isn't shown: Peek can't vouch for what's in it.

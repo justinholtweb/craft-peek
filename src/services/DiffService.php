@@ -232,8 +232,12 @@ class DiffService extends Component
                 return $elements === 0 ? '(none)' : $this->_relatedText($elements);
             }
 
-            if ($value instanceof Collection) {
-                // Element-free: read as the array it is, below.
+            if ($value instanceof Collection || is_array($value)) {
+                // Element-free arrays (Table fields) are shown only when every leaf is plain data:
+                // encoding anything else would run an object's jsonSerialize()/toArray().
+                $plain = $this->_plainData($value instanceof Collection ? $value->all() : $value);
+
+                return $plain === null ? Craft::t('peek', '(not shown over GraphQL)') : $this->_toJson($plain);
             } elseif (is_object($value) && method_exists($value, 'getRawContent')) {
                 // Rich text (CKEditor, HtmlFieldData). Never render it: rendering resolves reference
                 // tags and nested entries, which can pull in other elements. The stored HTML, minus
@@ -447,6 +451,40 @@ class DiffService extends Component
     private function _relatedText(int $count): string
     {
         return Craft::t('peek', '{n, plural, =1{# related element} other{# related elements}}', ['n' => $count]);
+    }
+
+    /**
+     * An array with every leaf null, scalar or a date (formatted `Y-m-d H:i:s`), or null if it holds
+     * anything else, or nests deeper than `$maxDepth` (fail closed).
+     *
+     * @param array<mixed> $value
+     * @return array<mixed>|null
+     */
+    private function _plainData(array $value, int $depth = 0, int $maxDepth = 5): ?array
+    {
+        if ($value !== [] && $depth >= $maxDepth) {
+            return null;
+        }
+
+        foreach ($value as $key => $item) {
+            if ($item === null || is_scalar($item)) {
+                continue;
+            }
+
+            if ($item instanceof \DateTimeInterface) {
+                $value[$key] = $item->format('Y-m-d H:i:s');
+            } elseif (is_array($item)) {
+                $item = $this->_plainData($item, $depth + 1, $maxDepth);
+                if ($item === null) {
+                    return null;
+                }
+                $value[$key] = $item;
+            } else {
+                return null;
+            }
+        }
+
+        return $value;
     }
 
     /**
