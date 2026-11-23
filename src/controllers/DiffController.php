@@ -74,17 +74,9 @@ class DiffController extends Controller
     {
         // The site the draft was opened in, so the sidebar's count and this page agree
         $siteId = $this->request->getQueryParam('siteId');
-        if ($siteId !== null && !Craft::$app->getSites()->getSiteById((int)$siteId)) {
-            $siteId = null;
-        }
+        $drafts = Plugin::getInstance()->drafts;
 
-        $draft = Entry::find()
-            ->id($draftId)
-            ->siteId($siteId !== null ? (int)$siteId : null)
-            ->drafts(true)
-            ->provisionalDrafts(false)
-            ->status(null)
-            ->one();
+        $draft = $drafts->getDraftById($draftId, $siteId !== null ? (int)$siteId : null);
 
         if (!$draft) {
             throw new NotFoundHttpException('Draft not found.');
@@ -96,15 +88,9 @@ class DiffController extends Controller
             throw new NotFoundHttpException('Canonical entry not found.');
         }
 
-        $elements = Craft::$app->getElements();
         $user = Craft::$app->getUser()->getIdentity();
 
-        if ($user === null || !$elements->canView($draft, $user) || !$elements->canView($canonical, $user)) {
-            throw new ForbiddenHttpException('You can’t view this draft.');
-        }
-
-        // canView() doesn't check site access; Craft's editor does, on multi-site installs
-        if (Craft::$app->getIsMultiSite() && !$user->can('editSite:' . $draft->getSite()->uid)) {
+        if ($user === null || !$drafts->canViewDiff($draft, $canonical, $user)) {
             throw new ForbiddenHttpException('You can’t view this draft.');
         }
 

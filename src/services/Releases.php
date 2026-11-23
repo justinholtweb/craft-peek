@@ -254,9 +254,12 @@ class Releases extends Component
             }
 
             if (!$elements->canSave($draft, $user) || !$elements->canSaveCanonical($draft, $user)) {
+                // Named only for someone who could read it: the title is the draft's content.
                 $errors[] = Craft::t('peek', '{user} isn’t allowed to publish “{title}”.', [
                     'user' => $user->getName(),
-                    'title' => $draft->title ?? "#{$draft->id}",
+                    'title' => $draft->title !== null && Plugin::getInstance()->drafts->canViewEntry($draft, $user)
+                        ? $draft->title
+                        : Craft::t('peek', 'Entry #{id}', ['id' => $entry->canonicalId]),
                 ]);
             }
         }

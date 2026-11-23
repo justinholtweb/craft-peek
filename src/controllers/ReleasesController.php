@@ -73,7 +73,8 @@ class ReleasesController extends Controller
                     ? Entry::find()->id($re->draftId)->drafts(true)->provisionalDrafts(null)->status(null)->one()
                     : null;
 
-                $canView = ($draft ?? $canonical) !== null && $elements->canView($draft ?? $canonical, $user);
+                // View rights and, on multi-site, the site — as everywhere Peek shows a draft
+                $canView = ($draft ?? $canonical) !== null && Plugin::getInstance()->drafts->canViewEntry($draft ?? $canonical, $user);
 
                 if ($re->draftId) {
                     $inRelease[] = $re->draftId;
