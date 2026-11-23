@@ -16,6 +16,7 @@ use CraftCms\Cms\Ui\UiContext;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use JustinHoltWeb\Peek\Data\ReleaseSummary;
+use JustinHoltWeb\Peek\Services\PendingDrafts;
 use JustinHoltWeb\Peek\Services\ReleaseSystem;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -106,7 +107,7 @@ class DraftReleasesController
             ->one();
 
         abort_unless($draft instanceof Entry, 404, 'Draft not found.');
-        abort_unless(currentUser()?->can('view', $draft), 403, 'You can’t view this draft.');
+        abort_unless(($user = currentUser()) !== null && PendingDrafts::canView($draft, $user), 403, 'You can’t view this draft.');
 
         return $draft;
     }

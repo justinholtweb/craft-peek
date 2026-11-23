@@ -371,7 +371,7 @@ class ReleasesController
             $draft = $entry->draftId ? $this->releases->draft($entry->draftId) : null;
             $canonical = Entry::find()->id($entry->canonicalId)->status(null)->site('*')->one();
             $subject = $draft ?? $canonical;
-            $canView = $subject instanceof Entry && $user->can('view', $subject);
+            $canView = $subject instanceof Entry && PendingDrafts::canView($subject, $user);
 
             $row = [
                 'id' => $entry->draftId ?? 'c'.$entry->canonicalId,

@@ -178,7 +178,7 @@ class Releases
                 $errors[] = t('{user} isn’t allowed to publish “{title}”.', [
                     'user' => $user->asElement()->getName(),
                     // Only a title they could read anyway.
-                    'title' => $user->can('view', $draft) ? ($draft->title ?? "#{$draft->id}") : "#{$draft->id}",
+                    'title' => PendingDrafts::canView($draft, $user) ? ($draft->title ?? "#{$draft->id}") : "#{$draft->id}",
                 ], category: 'peek');
             }
         }
